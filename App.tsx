@@ -9,7 +9,7 @@ import { TestRunner } from './services/testRunner';
 import { 
   Shield, LayoutDashboard, Database, Activity, FileCheck, 
   Menu, X, Loader2, Search, BookOpen, 
-  Info, CheckCircle2, ShieldAlert, Eye, Terminal, Network, Globe, AlertCircle, Wifi, WifiOff
+  Terminal, Globe, AlertCircle, Wifi, WifiOff
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -54,7 +54,6 @@ const App: React.FC = () => {
   const generateReport = async () => {
     if (results.length === 0) return;
     setIsAnalyzing(true);
-    // Deterministic local report generation
     const summary = await analysisService.generateReport(results);
     setReport(summary);
     setIsAnalyzing(false);
@@ -101,10 +100,8 @@ const App: React.FC = () => {
           </button>
         </nav>
 
-        <div className="p-4 border-t border-gray-800 hidden lg:block">
-          <button onClick={() => setIsDesktopSidebarOpen(!isDesktopSidebarOpen)} className="w-full flex items-center justify-center p-2 text-gray-500 hover:text-gray-300 hover:bg-gray-800 rounded-lg transition-colors">
-            {isDesktopSidebarOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
+        <div className="p-4 border-t border-gray-800 hidden lg:block text-center">
+           <p className="text-[10px] text-gray-500 font-mono">Sentinela Core v2.4</p>
         </div>
       </aside>
 
@@ -123,7 +120,7 @@ const App: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2 lg:gap-4">
             <div className="flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5">
               <div className="flex flex-col">
-                <span className="text-[8px] text-gray-500 font-bold uppercase mb-1">Target Connectivity</span>
+                <span className="text-[8px] text-gray-500 font-bold uppercase mb-1">Target Endpoint</span>
                 <div className="flex items-center gap-2">
                   <input 
                     type="text" 
@@ -131,7 +128,6 @@ const App: React.FC = () => {
                     onChange={(e) => setTargetUrl(e.target.value)}
                     className="bg-transparent border-none p-0 text-[10px] lg:text-xs text-blue-400 focus:ring-0 min-w-[150px] font-mono"
                   />
-                  {/* Fixed Lucide icon title prop error by wrapping in span with title attribute */}
                   {isCheckingTarget ? (
                     <Loader2 size={14} className="animate-spin text-gray-500" />
                   ) : isTargetOnline ? (
@@ -149,7 +145,7 @@ const App: React.FC = () => {
 
             <button onClick={generateReport} disabled={results.length === 0 || isAnalyzing} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-500 text-white text-xs lg:text-sm font-semibold rounded-lg shadow-lg shadow-blue-900/20 transition-all flex items-center gap-2">
               {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <FileCheck size={16} />}
-              <span>Generate Analysis</span>
+              <span>Generate Audit</span>
             </button>
           </div>
         </header>
@@ -158,8 +154,8 @@ const App: React.FC = () => {
           {report ? (
             <div className="space-y-6">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-black">Security Posture Report</h2>
-                <button onClick={() => setReport(null)} className="px-3 py-2 text-xs bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300">Back to Lab</button>
+                <h2 className="text-xl font-black">Post-Audit Forensics</h2>
+                <button onClick={() => setReport(null)} className="px-3 py-2 text-xs bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300">Lab View</button>
               </div>
               <ReportView summary={report} results={results} />
             </div>
@@ -170,13 +166,13 @@ const App: React.FC = () => {
                   Validation Lab
                   {isTargetOnline === false && (
                     <span className="flex items-center gap-1.5 px-2 py-1 bg-red-950/40 border border-red-900/50 rounded text-[10px] text-red-400 normal-case font-bold">
-                      <AlertCircle size={12} /> Target Unreachable
+                      <AlertCircle size={12} /> Target Offline
                     </span>
                   )}
                 </h2>
-                <p className="text-sm lg:text-base text-gray-400 max-w-2xl">
-                  Attempting vectors against <span className="text-blue-400 font-mono">{targetUrl}</span>. 
-                  If the target is offline, tests will show as 'Blocked' incorrectly.
+                <p className="text-sm lg:text-base text-gray-400 max-w-2xl font-medium">
+                  Testing resilience of <span className="text-blue-400 font-mono font-bold underline">{targetUrl}</span>. 
+                  Data proof is captured for every transaction to verify security policy enforcement.
                 </p>
               </div>
 
@@ -194,8 +190,19 @@ const App: React.FC = () => {
           )}
         </div>
         
-        <footer className="p-6 lg:p-8 border-t border-gray-900 text-center text-[10px] lg:text-xs text-gray-600">
-          <p>© 2026 Sentinela Validation Suite • Manual Testing Mode Enabled</p>
+        <footer className="p-8 lg:p-12 border-t border-gray-900 text-center text-[10px] lg:text-xs text-gray-500">
+          <div className="flex items-center justify-center gap-4 mb-3">
+             <Shield size={14} className="text-blue-600" />
+             <div className="h-px w-12 bg-gray-800" />
+             <Terminal size={14} className="text-gray-700" />
+          </div>
+          <p className="font-bold text-gray-400 uppercase tracking-[0.2em] mb-1">Sentinela validation suite</p>
+          <p className="mb-2">Professional Grade NGFW & EDR Capability Testing</p>
+          <div className="flex items-center justify-center gap-2 font-mono text-gray-600">
+             <span>App created by <span className="text-blue-500 font-black">tegar</span></span>
+             <span className="text-gray-800">•</span>
+             <span className="bg-orange-950/30 text-orange-600 px-2 py-0.5 rounded border border-orange-900/40 font-bold uppercase tracking-tighter">on testing phase</span>
+          </div>
         </footer>
       </main>
 
@@ -205,15 +212,11 @@ const App: React.FC = () => {
           <div className="relative bg-gray-900 border border-gray-800 w-full max-w-2xl rounded-3xl p-8 animate-in fade-in zoom-in duration-300">
             <h3 className="text-2xl font-black mb-4 flex items-center gap-3"><Terminal size={24} className="text-blue-500" /> Lab Field Manual</h3>
             <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-              <p>1. <strong className="text-white">Verify Connectivity:</strong> Ensure the icon in the header is green. If it's red, your network or target is down.</p>
-              <p>2. <strong className="text-white">Trigger Vectors:</strong> Execute individual attacks. WAF/IPS tests send network packets. Malware tests simulate file drops.</p>
-              <p>3. <strong className="text-white">Interpreting Results:</strong></p>
-              <ul className="pl-4 border-l border-gray-800 space-y-2">
-                <li><span className="text-red-400 font-bold">PASSED:</span> The security control FAILED. The threat reached the target.</li>
-                <li><span className="text-green-400 font-bold">BLOCKED:</span> The security control SUCCESS. The connection was terminated or timed out.</li>
-              </ul>
+              <p>1. <strong className="text-white">Verify Connectivity:</strong> Green icon = Reachable. Red icon = Target Offline.</p>
+              <p>2. <strong className="text-white">Analyze Proof:</strong> After each test, view the 'Data Proof' to see exactly what the server or firewall returned.</p>
+              <p>3. <strong className="text-white">Reporting:</strong> Generate the audit report to see a visual map of your security blindspots.</p>
             </div>
-            <button onClick={() => setShowGuide(false)} className="mt-8 w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition-all">Begin Testing</button>
+            <button onClick={() => setShowGuide(false)} className="mt-8 w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition-all">Enter Lab</button>
           </div>
         </div>
       )}

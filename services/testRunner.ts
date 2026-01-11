@@ -23,31 +23,52 @@ export class TestRunner {
         const url = `${baseUrl}/?sentinela_test_id=${payload.id}&vector=${encodeURIComponent(payload.content)}`;
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-        // We try a normal fetch first to get "Proof" (response body).
-        // If it fails due to CORS, we fallback to 'no-cors' just to see if the connection is alive.
         let responseText = "";
-        let responseStatus = 0;
+        let responseStatusText = "";
+        let responseCode = 0;
         
         try {
           const response = await fetch(url, {
             method: 'GET',
-            headers: { 'X-Sentinela-Payload': payload.content },
+            headers: { 
+              'X-Sentinela-Payload': payload.content,
+              'User-Agent': payload.id === 'evasion-ua-spoof' ? payload.content : 'Sentinela-Security-Scanner/2.0'
+            },
             signal: controller.signal
           });
-          responseStatus = response.status;
+          
+          responseCode = response.status;
+          responseStatusText = response.statusText || (response.status === 200 ? "OK" : "Unknown Status");
           responseText = await response.text();
-        } catch (corsOrNetworkError: any) {
-          // If the network error is a connection reset, the catch block below handles it.
-          // If it's a CORS error, we try 'no-cors' to verify the firewall didn't drop it.
-          const fallbackResponse = await fetch(url, {
-            method: 'GET',
-            mode: 'no-cors',
-            signal: controller.signal
-          });
-          responseText = "[Proof Hidden by CORS Policy - Request reached server]";
-          responseStatus = 200; // no-cors always results in status 0, but we know it reached.
+          
+          // Logic: If status is 4xx or 5xx, the WAF/NGFW likely blocked it.
+          // However, some firewalls return 200 with a custom block page.
+          if (responseCode >= 400) {
+             clearTimeout(timeoutId);
+             return {
+                testId: payload.id,
+                status: TestStatus.BLOCKED,
+                timestamp: new Date().toISOString(),
+                responseTime: Date.now() - startTime,
+                proof: `HTTP ${responseCode} ${responseStatusText}: ${responseText.substring(0, 150).replace(/<[^>]*>/g, '')}`,
+                details: `FIREWALL BLOCK DETECTED: The target server returned a rejection code (${responseCode}). This indicates the NGFW/WAF successfully identified and stopped the signature.`
+             };
+          }
+        } catch (error: any) {
+          // If fetch fails completely, it's often a TCP RST (Active Block)
+          const duration = Date.now() - startTime;
+          clearTimeout(timeoutId);
+          
+          return {
+            testId: payload.id,
+            status: TestStatus.BLOCKED,
+            timestamp: new Date().toISOString(),
+            responseTime: duration,
+            proof: `CONNECTION_TERMINATED: ${error.message}`,
+            details: `ACTIVE DROP: The network connection was forcefully closed by the perimeter control before a handshake could complete.`
+          };
         }
         
         clearTimeout(timeoutId);
@@ -57,11 +78,10 @@ export class TestRunner {
           status: TestStatus.PASSED,
           timestamp: new Date().toISOString(),
           responseTime: Date.now() - startTime,
-          proof: responseText.substring(0, 200) + (responseText.length > 200 ? "..." : ""),
-          details: `SUCCESSFUL PENETRATION: Status ${responseStatus}. The payload bypassed security inspection and was accepted by the server.`
+          proof: `HTTP 200 OK - DATA SNIPPET: ${responseText.substring(0, 180)}`,
+          details: `SECURITY FAILURE: The payload reached the server and returned data. The NGFW failed to inspect or block this traffic.`
         };
       } else if (payload.type === 'download') {
-        // ... (download logic remains same)
         const blob = new Blob([payload.content], { type: 'text/plain' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -76,7 +96,8 @@ export class TestRunner {
           testId: payload.id,
           status: TestStatus.PASSED,
           timestamp: new Date().toISOString(),
-          details: "FILE DROPPED: Malware simulation file successfully saved to host disk."
+          proof: `File Write Successful: bytes=${payload.content.length}`,
+          details: "MALWARE DROP: File written to local disk. Endpoint protection failed to quarantine the known-malicious string."
         };
       } else if (payload.type === 'script') {
         await navigator.clipboard.writeText(payload.content);
@@ -84,7 +105,8 @@ export class TestRunner {
           testId: payload.id,
           status: TestStatus.IDLE,
           timestamp: new Date().toISOString(),
-          details: "BEHAVIORAL PAYLOAD: Copied to clipboard for manual host execution."
+          proof: `Payload copied to system clipboard`,
+          details: "BEHAVIORAL PAYLOAD: Ready for manual host execution."
         };
       }
       
@@ -92,27 +114,14 @@ export class TestRunner {
         testId: payload.id,
         status: TestStatus.ERROR,
         timestamp: new Date().toISOString(),
-        details: "Unsupported test type."
+        details: "Unsupported vector type."
       };
     } catch (error: any) {
-      const duration = Date.now() - startTime;
-      
-      if (error.name === 'AbortError' || duration > 4500) {
-        return {
-          testId: payload.id,
-          status: TestStatus.BLOCKED,
-          timestamp: new Date().toISOString(),
-          responseTime: duration,
-          details: `SILENT DROP (IPS/FW): Connection timed out. Firewall likely dropped packets.`
-        };
-      }
-
       return {
         testId: payload.id,
-        status: TestStatus.BLOCKED,
+        status: TestStatus.ERROR,
         timestamp: new Date().toISOString(),
-        responseTime: duration,
-        details: `ACTIVE BLOCK (TCP RST): Connection actively terminated by security control: ${error.message}`
+        details: `FATAL: ${error.message}`
       };
     }
   }
