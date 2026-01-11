@@ -69,6 +69,7 @@ const App: React.FC = () => {
     });
   }, [activeTab, searchQuery]);
 
+  // Dynamically derive categories from the enum
   const categories = ['all', ...Object.values(TestCategory)];
 
   return (
@@ -86,22 +87,22 @@ const App: React.FC = () => {
         </div>
 
         <nav className="flex-1 px-4 mt-8 space-y-1 overflow-y-auto custom-scrollbar">
-          <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-2 mb-4">{(isDesktopSidebarOpen || isSidebarOpen) ? 'Capabilities' : 'CAP'}</div>
+          <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-2 mb-4">{(isDesktopSidebarOpen || isSidebarOpen) ? 'Audit Surface' : 'CAP'}</div>
           {categories.map((cat) => (
             <button key={cat} onClick={() => { setActiveTab(cat as any); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group ${activeTab === cat ? 'bg-blue-600/10 text-blue-400 border border-blue-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'}`}>
               <Database size={18} className={activeTab === cat ? 'text-blue-400' : 'text-gray-500'} />
-              {(isDesktopSidebarOpen || isSidebarOpen) && <span className="capitalize text-xs truncate">{cat}</span>}
+              {(isDesktopSidebarOpen || isSidebarOpen) && <span className="capitalize text-[10px] lg:text-xs truncate">{cat}</span>}
             </button>
           ))}
           <div className="pt-8 text-[10px] font-bold text-gray-500 uppercase tracking-widest px-2 mb-4">{(isDesktopSidebarOpen || isSidebarOpen) ? 'Support' : 'S'}</div>
           <button onClick={() => { setShowGuide(true); setIsSidebarOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-all">
             <BookOpen size={18} className="text-gray-500" />
-            {(isDesktopSidebarOpen || isSidebarOpen) && <span>Field Manual</span>}
+            {(isDesktopSidebarOpen || isSidebarOpen) && <span className="text-xs">Field Manual</span>}
           </button>
         </nav>
 
         <div className="p-4 border-t border-gray-800 hidden lg:block text-center">
-           <p className="text-[10px] text-gray-500 font-mono">Sentinela Core v2.5</p>
+           <p className="text-[10px] text-gray-500 font-mono">Sentinela Core v3.0</p>
         </div>
       </aside>
 
@@ -113,14 +114,14 @@ const App: React.FC = () => {
             </button>
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-              <input type="text" placeholder="Search vectors..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-gray-900 border border-gray-800 rounded-lg py-1.5 lg:py-2 pl-9 pr-4 text-xs lg:text-sm focus:outline-none focus:border-blue-500 transition-all" />
+              <input type="text" placeholder="Filter audit vectors..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-gray-900 border border-gray-800 rounded-lg py-1.5 lg:py-2 pl-9 pr-4 text-xs lg:text-sm focus:outline-none focus:border-blue-500 transition-all" />
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 lg:gap-4">
             <div className="flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5">
               <div className="flex flex-col">
-                <span className="text-[8px] text-gray-500 font-bold uppercase mb-1">Target Endpoint</span>
+                <span className="text-[8px] text-gray-500 font-bold uppercase mb-1">Audit Endpoint</span>
                 <div className="flex items-center gap-2">
                   <input 
                     type="text" 
@@ -145,7 +146,7 @@ const App: React.FC = () => {
 
             <button onClick={generateReport} disabled={results.length === 0 || isAnalyzing} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-500 text-white text-xs lg:text-sm font-semibold rounded-lg shadow-lg shadow-blue-900/20 transition-all flex items-center gap-2">
               {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <FileCheck size={16} />}
-              <span>Generate Forensic Audit</span>
+              <span>Generate Report</span>
             </button>
           </div>
         </header>
@@ -154,8 +155,8 @@ const App: React.FC = () => {
           {report ? (
             <div className="space-y-6">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-black">Post-Audit Forensics</h2>
-                <button onClick={() => setReport(null)} className="px-3 py-2 text-xs bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300">Lab View</button>
+                <h2 className="text-xl font-black uppercase tracking-tight">Post-Audit Assessment</h2>
+                <button onClick={() => setReport(null)} className="px-3 py-2 text-xs bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 font-bold">Back to Lab</button>
               </div>
               <ReportView summary={report} results={results} />
             </div>
@@ -171,8 +172,8 @@ const App: React.FC = () => {
                   )}
                 </h2>
                 <p className="text-sm lg:text-base text-gray-400 max-w-2xl font-medium">
-                  Auditing security efficacy for <span className="text-blue-400 font-mono font-bold underline">{targetUrl}</span>. 
-                  Every execution captures deterministic evidence of block or bypass.
+                  NGFW Efficacy Testing for <span className="text-blue-400 font-mono font-bold underline">{targetUrl}</span>. 
+                  Select a category to begin specific vector validation.
                 </p>
               </div>
 
@@ -196,12 +197,11 @@ const App: React.FC = () => {
              <div className="h-px w-12 bg-gray-800" />
              <Terminal size={14} className="text-gray-700" />
           </div>
-          <p className="font-bold text-gray-400 uppercase tracking-[0.2em] mb-1">Sentinela validation suite</p>
-          <p className="mb-2">Automated NGFW, WAF, & EDR Efficacy Auditor</p>
+          <p className="font-bold text-gray-400 uppercase tracking-[0.2em] mb-1">Sentinela Security Auditor</p>
           <div className="flex items-center justify-center gap-2 font-mono text-gray-600">
-             <span>App created by <span className="text-blue-500 font-black">tegar</span></span>
+             <span>Engineered by <span className="text-blue-500 font-black">tegar</span></span>
              <span className="text-gray-800">•</span>
-             <span className="bg-orange-950/30 text-orange-600 px-2 py-0.5 rounded border border-orange-900/40 font-bold uppercase tracking-tighter">on testing phase</span>
+             <span className="bg-blue-950/30 text-blue-600 px-2 py-0.5 rounded border border-blue-900/40 font-bold uppercase tracking-tighter">NGFW Precision Mode</span>
           </div>
         </footer>
       </main>
@@ -212,11 +212,11 @@ const App: React.FC = () => {
           <div className="relative bg-gray-900 border border-gray-800 w-full max-w-2xl rounded-3xl p-8 animate-in fade-in zoom-in duration-300">
             <h3 className="text-2xl font-black mb-4 flex items-center gap-3"><Terminal size={24} className="text-blue-500" /> Lab Field Manual</h3>
             <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-              <p>1. <strong className="text-white">Endpoint Verification:</strong> Ensure the connectivity status is Green before starting.</p>
-              <p>2. <strong className="text-white">Forensic Evidence:</strong> After triggering an attack, examine the captured response body or header to confirm if the firewall actively blocked or was bypassed.</p>
-              <p>3. <strong className="text-white">Audit Trail:</strong> Use the Report function to summarize the entire test surface and technical gaps.</p>
+              <p>1. <strong className="text-white">Endpoint Prep:</strong> Ensure the target is reachable and HTTPS decryption is considered on your NGFW.</p>
+              <p>2. <strong className="text-white">Deterministic Evidence:</strong> Success (Blocked) means your perimeter infrastructure recognized the signature. Failure (Passed) indicates a blind spot.</p>
+              <p>3. <strong className="text-white">Forensic Reporting:</strong> Generate the final assessment to identify patterns of failure in your security stack.</p>
             </div>
-            <button onClick={() => setShowGuide(false)} className="mt-8 w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition-all">Begin Audit</button>
+            <button onClick={() => setShowGuide(false)} className="mt-8 w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition-all uppercase tracking-widest text-white shadow-xl">Enter Lab Environment</button>
           </div>
         </div>
       )}

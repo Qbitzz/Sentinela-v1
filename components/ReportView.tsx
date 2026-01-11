@@ -1,215 +1,321 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ReportSummary, TestResult } from '../types';
 import { TEST_PAYLOADS } from '../constants';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
-  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis 
+  Legend
 } from 'recharts';
-import { ShieldCheck, ShieldAlert, FileText, Zap, Activity, Target, AlertTriangle, Terminal } from 'lucide-react';
+import { 
+  ShieldCheck, ShieldAlert, FileText, Zap, Activity, Target, 
+  Terminal, ArrowRight, Server, Shield, Globe, 
+  Cpu, MapPin, Loader2, FileDown, CheckCircle2
+} from 'lucide-react';
 
 interface Props {
   summary: ReportSummary;
   results: TestResult[];
 }
 
+const AttackPathFlow: React.FC<{ result: TestResult }> = ({ result }) => {
+  const reachedPerimeter = result.path?.includes('Perimeter');
+  const reachedDestination = result.path?.includes('Destination');
+  
+  return (
+    <div className="flex items-center justify-between w-full py-10 px-6 bg-gray-900/40 rounded-2xl border border-gray-800 mb-6 overflow-hidden relative">
+      <div className="flex flex-col items-center gap-3 z-10">
+        <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-900/40 print:shadow-none">
+          <Globe size={24} />
+        </div>
+        <div className="text-center">
+          <span className="text-[10px] font-black uppercase text-gray-400 block tracking-normal">Source</span>
+          <span className="text-[10px] font-mono text-blue-400 leading-normal">Sentinela Lab</span>
+        </div>
+      </div>
+      
+      <div className={`flex-1 h-0.5 mx-4 relative ${reachedPerimeter ? 'bg-blue-500' : 'bg-gray-800'}`}>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-950 p-1.5 rounded-full border border-gray-800 print:bg-white">
+          <ArrowRight size={14} className={reachedPerimeter ? 'text-blue-500' : 'text-gray-800'} />
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center gap-3 z-10 relative">
+        <div className={`w-14 h-14 rounded-2xl border-2 flex items-center justify-center transition-all duration-500 ${result.status === 'blocked' ? 'bg-green-950/30 border-green-500 text-green-500 shadow-lg shadow-green-900/20' : reachedPerimeter ? 'bg-red-950/20 border-red-500 text-red-500' : 'bg-gray-800 border-gray-700 text-gray-600'} print:shadow-none`}>
+          <Shield size={28} />
+        </div>
+        <div className="text-center">
+          <span className="text-[10px] font-black uppercase text-gray-400 block tracking-normal">Perimeter</span>
+          <span className="text-[10px] font-mono text-gray-500 max-w-[120px] truncate leading-normal">{result.blockingAgent || 'NGFW Gateway'}</span>
+        </div>
+        {result.status === 'blocked' && (
+           <div className="absolute -top-12 bg-green-500 text-black text-[9px] font-black px-3 py-1.5 rounded-full whitespace-nowrap animate-bounce shadow-xl print:animate-none print:shadow-none">
+             BLOCKED BY {result.blockingAgent?.split(' ')[0].toUpperCase()}
+           </div>
+        )}
+      </div>
+
+      <div className={`flex-1 h-0.5 mx-4 relative ${reachedDestination ? 'bg-red-500' : 'bg-gray-800'}`}>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-950 p-1.5 rounded-full border border-gray-800 print:bg-white">
+          <ArrowRight size={14} className={reachedDestination ? 'text-red-500' : 'text-gray-800'} />
+        </div>
+      </div>
+
+      <div className="flex flex-col items-center gap-3 z-10">
+        <div className={`w-12 h-12 rounded-2xl border-2 flex items-center justify-center transition-all ${reachedDestination ? 'bg-red-600 border-red-400 text-white shadow-2xl shadow-red-900/60 scale-110' : 'bg-gray-800 border-gray-700 text-gray-600'} print:shadow-none print:scale-100`}>
+          <Server size={24} />
+        </div>
+        <div className="text-center">
+          <span className="text-[10px] font-black uppercase text-gray-400 block tracking-normal">Host</span>
+          <span className={`text-[10px] font-mono leading-normal ${reachedDestination ? 'text-red-400' : 'text-gray-600'}`}>Target Server</span>
+        </div>
+        {reachedDestination && (
+           <div className="absolute -top-12 bg-red-600 text-white text-[9px] font-black px-3 py-1.5 rounded-full whitespace-nowrap animate-pulse shadow-xl print:animate-none print:shadow-none">
+             EXPLOIT SUCCESSFUL
+           </div>
+        )}
+      </div>
+
+      <div className="absolute inset-0 opacity-[0.03] pointer-events-none print:hidden" style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+    </div>
+  );
+};
+
 export const ReportView: React.FC<Props> = ({ summary, results }) => {
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleDownloadPDF = () => {
+    setIsExporting(true);
+    setTimeout(() => {
+      window.print();
+      setIsExporting(false);
+    }, 500);
+  };
+
   const pieData = [
     { name: 'Blocked', value: summary.blockedCount, color: '#10b981' },
     { name: 'Passed', value: summary.passedCount, color: '#ef4444' }
   ];
 
-  const categoryStats = results.reduce((acc: any, curr) => {
-    const payload = TEST_PAYLOADS.find(p => p.id === curr.testId);
-    const cat = payload?.category || 'Unknown';
-    if (!acc[cat]) acc[cat] = { subject: cat, blocked: 0, passed: 0, fullMark: 5 };
-    if (curr.status === 'blocked') acc[cat].blocked += 1;
-    else if (curr.status === 'passed') acc[cat].passed += 1;
-    return acc;
-  }, {});
-
-  const barData = Object.values(categoryStats);
-
-  const getHealthColor = () => {
-    if (summary.overallHealth === 'Good') return 'text-green-400 bg-green-950/20 border-green-900/30';
-    if (summary.overallHealth === 'Moderate') return 'text-yellow-400 bg-yellow-950/20 border-yellow-900/30';
-    return 'text-red-400 bg-red-950/20 border-red-900/30';
-  };
+  const uniqueAgents = Array.from(new Set(results.map(r => r.blockingAgent).filter(Boolean)));
 
   return (
-    <div className="space-y-6 lg:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-      {/* Top Cards Header */}
+    <div className="space-y-6 lg:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20 print:p-0 print:pb-0 print:space-y-4 overflow-visible">
+      <style>{`
+        @media print {
+          body { background: white !important; color: black !important; -webkit-print-color-adjust: exact !important; }
+          .bg-gray-950, .bg-gray-900, .bg-gray-800, .bg-gray-800\\/50 { background: #f9fafb !important; color: black !important; border-color: #e5e7eb !important; }
+          .text-white, .text-gray-100, .text-gray-200, .text-gray-300 { color: black !important; }
+          .text-gray-400, .text-gray-500, .text-gray-600 { color: #4b5563 !important; }
+          .print\\:hidden { display: none !important; }
+          .rounded-2xl, .rounded-xl { border-radius: 8px !important; }
+          .border { border: 1px solid #e5e7eb !important; }
+          table { border-collapse: collapse !important; width: 100% !important; border: 1px solid #e5e7eb !important; }
+          th, td { border: 1px solid #e5e7eb !important; color: black !important; padding: 12px !important; line-height: 1.5 !important; }
+          .shadow-lg, .shadow-2xl, .shadow-xl { shadow: none !important; box-shadow: none !important; }
+          aside, header, footer, button { display: none !important; }
+          .print\\:block { display: block !important; }
+          .bg-blue-600 { background-color: #2563eb !important; color: white !important; }
+          .bg-green-500 { background-color: #10b981 !important; color: white !important; }
+          .bg-red-600 { background-color: #dc2626 !important; color: white !important; }
+          @page { margin: 1.5cm; }
+        }
+      `}</style>
+
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:mb-8">
+        <div>
+          <h2 className="text-2xl font-black uppercase tracking-tight flex items-center gap-3">
+            <FileText className="text-blue-500" /> Forensic Security Audit
+          </h2>
+          <p className="text-xs text-gray-500 font-mono mt-1">REPORT_UID: {Math.random().toString(36).substr(2, 9).toUpperCase()}</p>
+        </div>
+        <button 
+          onClick={handleDownloadPDF}
+          disabled={isExporting}
+          className="print:hidden flex items-center gap-2 px-5 py-2.5 bg-gray-100 text-gray-900 hover:bg-white rounded-xl font-bold text-xs transition-all shadow-lg active:scale-95 disabled:opacity-50"
+        >
+          {isExporting ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+          {isExporting ? 'Preparing Report...' : 'Download PDF Report'}
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gray-800 p-5 lg:p-6 rounded-2xl border border-gray-700">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-2 bg-blue-900/30 text-blue-400 rounded-lg"><Activity size={20} /></div>
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Score</span>
-          </div>
-          <div className="text-3xl lg:text-4xl font-black text-white">{summary.score}%</div>
-          <div className="mt-4 h-1.5 bg-gray-900 rounded-full overflow-hidden">
-            <div 
-              className={`h-full transition-all duration-1000 ${summary.score > 70 ? 'bg-green-500' : summary.score > 40 ? 'bg-yellow-500' : 'bg-red-500'}`} 
-              style={{ width: `${summary.score}%` }} 
-            />
-          </div>
+        <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 hover:border-blue-500/50 transition-all group print:bg-gray-50">
+           <div className="flex items-center justify-between mb-4">
+             <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-normal">Resilience</span>
+             <Activity size={14} className="text-blue-500" />
+           </div>
+           <div className="text-5xl font-black text-white group-hover:scale-105 transition-transform origin-left leading-tight py-1">{summary.score}%</div>
+           <div className="mt-4 h-2 bg-gray-900 rounded-full overflow-hidden print:border print:bg-gray-200">
+             <div className="h-full bg-blue-500" style={{ width: `${summary.score}%` }} />
+           </div>
+        </div>
+        
+        <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 hover:border-green-500/50 transition-all group print:bg-gray-50">
+           <div className="flex items-center justify-between mb-4">
+             <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-normal">Interceptions</span>
+             <ShieldCheck size={14} className="text-green-500" />
+           </div>
+           <div className="text-5xl font-black text-green-400 leading-tight py-1">{summary.blockedCount}</div>
+           <div className="text-[10px] text-gray-500 mt-2 font-mono uppercase tracking-normal">Verified Blocks</div>
         </div>
 
-        <div className={`p-5 lg:p-6 rounded-2xl border border-gray-700 shadow-xl ${getHealthColor()}`}>
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-2 bg-black/20 rounded-lg"><Target size={20} /></div>
-            <span className="text-[10px] font-bold opacity-60 uppercase tracking-wider">Assessment</span>
-          </div>
-          <div className="text-2xl lg:text-3xl font-black">{summary.overallHealth}</div>
-          <p className="mt-2 text-[10px] opacity-80">Security control telemetry.</p>
+        <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 hover:border-red-500/50 transition-all group print:bg-gray-50">
+           <div className="flex items-center justify-between mb-4">
+             <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-normal">Gaps</span>
+             <ShieldAlert size={14} className="text-red-500" />
+           </div>
+           <div className="text-5xl font-black text-red-500 leading-tight py-1">{summary.passedCount}</div>
+           <div className="text-[10px] text-gray-500 mt-2 font-mono uppercase tracking-normal">Weaknesses</div>
         </div>
 
-        <div className="bg-gray-800 p-5 lg:p-6 rounded-2xl border border-gray-700 flex items-center gap-4">
-          <div className="p-3 bg-green-900/30 text-green-400 rounded-xl"><ShieldCheck size={24} /></div>
-          <div>
-            <div className="text-2xl lg:text-3xl font-black text-white">{summary.blockedCount}</div>
-            <div className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-tight">Blocked</div>
-          </div>
-        </div>
-
-        <div className="bg-gray-800 p-5 lg:p-6 rounded-2xl border border-gray-700 flex items-center gap-4">
-          <div className="p-3 bg-red-900/30 text-red-400 rounded-xl"><ShieldAlert size={24} /></div>
-          <div>
-            <div className="text-2xl lg:text-3xl font-black text-white">{summary.passedCount}</div>
-            <div className="text-[9px] text-gray-500 font-bold uppercase tracking-widest leading-tight">Gaps</div>
-          </div>
+        <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700 hover:border-purple-500/50 transition-all group print:bg-gray-50">
+           <div className="flex items-center justify-between mb-4">
+             <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest leading-normal">Posture</span>
+             <Cpu size={14} className="text-purple-500" />
+           </div>
+           <div className={`text-3xl font-black leading-tight py-1 ${summary.overallHealth === 'Good' ? 'text-green-400' : 'text-red-400'}`}>{summary.overallHealth}</div>
+           <div className="text-[10px] text-gray-500 mt-2 font-mono uppercase tracking-normal">System Status</div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-        <div className="lg:col-span-2 space-y-6 lg:space-y-8">
-          <div className="bg-gray-800 p-6 lg:p-8 rounded-2xl border border-gray-700 relative overflow-hidden group">
-            <h3 className="text-lg lg:text-xl font-bold mb-6 flex items-center gap-3">
-              <Zap size={18} className="text-blue-400" /> Posture Analysis
-            </h3>
-            <div className="text-xs lg:text-sm text-gray-300 leading-relaxed font-mono whitespace-pre-line z-10 relative bg-gray-900/50 p-4 rounded-xl border border-gray-700">
-              {summary.aiAnalysis}
-            </div>
-          </div>
-
-          <div className="bg-gray-800 p-6 lg:p-8 rounded-2xl border border-gray-700">
-            <h3 className="text-base lg:text-lg font-bold mb-6 flex items-center gap-2">
-              <Activity size={18} className="text-green-400" /> Capability Matrix
-            </h3>
-            <div className="h-[250px] lg:h-[350px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={barData}>
-                  <PolarGrid stroke="#374151" />
-                  <PolarAngleAxis dataKey="subject" stroke="#9ca3af" fontSize={8} />
-                  <PolarRadiusAxis angle={30} domain={[0, 'auto']} stroke="#4b5563" fontSize={8} />
-                  <Radar name="Safe" dataKey="blocked" stroke="#10b981" fill="#10b981" fillOpacity={0.6} />
-                  <Radar name="Gap" dataKey="passed" stroke="#ef4444" fill="#ef4444" fillOpacity={0.6} />
-                  <Tooltip contentStyle={{ backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '8px', fontSize: '10px' }} />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-6 lg:space-y-8">
-           <div className="bg-gray-800 p-6 lg:p-8 rounded-2xl border border-gray-700 flex flex-col items-center">
-              <h3 className="text-base lg:text-lg font-bold mb-4 w-full">Outcome Distribution</h3>
-              <div className="h-48 lg:h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={pieData} innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value">
-                      {pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
-                    </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '8px', fontSize: '10px' }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="grid grid-cols-2 gap-3 w-full mt-4">
-                 <div className="text-center p-2 rounded-xl bg-gray-900 border border-gray-800">
-                    <div className="text-green-400 font-black text-base">{summary.blockedCount}</div>
-                    <div className="text-[8px] text-gray-500 uppercase font-bold tracking-tighter">Safe</div>
-                 </div>
-                 <div className="text-center p-2 rounded-xl bg-gray-900 border border-gray-800">
-                    <div className="text-red-400 font-black text-base">{summary.passedCount}</div>
-                    <div className="text-[8px] text-gray-500 uppercase font-bold tracking-tighter">Gap</div>
-                 </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+           <div className="bg-gray-800 p-8 rounded-2xl border border-gray-700 print:bg-white print:border-gray-200">
+              <h3 className="text-xl font-black mb-8 flex items-center gap-3">
+                <Target size={22} className="text-blue-500" /> 
+                <span className="tracking-tight uppercase">Attack Topology Analysis</span>
+              </h3>
+              <div className="space-y-8">
+                 {results.slice(0, 5).map((res, i) => (
+                    <div key={i} className="animate-in fade-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${i * 150}ms` }}>
+                       <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                             <div className="p-2 bg-gray-900 rounded-md border border-gray-700 print:bg-gray-100">
+                                <Terminal size={14} className="text-blue-400" />
+                             </div>
+                             <span className="text-xs font-black uppercase tracking-normal text-gray-200 leading-relaxed">
+                                {TEST_PAYLOADS.find(p => p.id === res.testId)?.name}
+                             </span>
+                          </div>
+                          <span className={`text-[10px] font-black px-2.5 py-1 rounded border ${res.status === 'blocked' ? 'bg-green-950/30 border-green-900/50 text-green-400' : 'bg-red-950/30 border-red-900/50 text-red-400'} print:text-black`}>
+                             {res.status.toUpperCase()}
+                          </span>
+                       </div>
+                       <AttackPathFlow result={res} />
+                    </div>
+                 ))}
+                 {results.length > 5 && (
+                   <div className="text-center py-4 text-[10px] font-bold text-gray-600 uppercase tracking-widest print:text-gray-400">
+                     + {results.length - 5} additional attack traces documented below
+                   </div>
+                 )}
               </div>
            </div>
 
-           <div className="bg-gray-800 p-6 lg:p-8 rounded-2xl border border-gray-700 overflow-hidden relative">
-              <div className="absolute top-2 right-2">
-                 <AlertTriangle size={14} className="text-red-500 opacity-30" />
+           <div className="bg-gray-800 p-8 rounded-2xl border border-gray-700 print:bg-white print:border-gray-200">
+             <h3 className="text-xl font-black mb-6 flex items-center gap-3">
+               <Zap size={22} className="text-orange-500" /> 
+               <span className="tracking-tight uppercase leading-normal">Forensic Intelligence Insights</span>
+             </h3>
+             <div className="text-[11px] font-mono text-gray-300 bg-gray-950/50 p-8 rounded-2xl border border-gray-800 leading-relaxed whitespace-pre-wrap shadow-inner print:shadow-none print:bg-gray-50 print:text-gray-800 print:border-gray-200">
+                {summary.aiAnalysis}
+             </div>
+           </div>
+        </div>
+
+        <div className="space-y-6">
+           <div className="bg-gray-800 p-8 rounded-2xl border border-gray-700 print:bg-white print:border-gray-200">
+              <h3 className="text-lg font-black uppercase tracking-tight mb-6 leading-normal">Threat Distribution</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pieData} innerRadius={60} outerRadius={80} paddingAngle={8} dataKey="value" stroke="none">
+                      {pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#030712', border: '1px solid #374151', borderRadius: '12px', fontSize: '10px', color: '#fff' }} 
+                      itemStyle={{ color: '#fff' }}
+                      className="print:hidden"
+                    />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-              <h3 className="text-[10px] font-bold text-gray-400 mb-6 uppercase tracking-widest">Exposed Data Proof</h3>
-              <div className="space-y-4">
-                 {results.filter(r => r.status === 'passed' && r.proof).slice(0, 3).map((r, i) => {
-                    const p = TEST_PAYLOADS.find(x => x.id === r.testId);
-                    return (
-                       <div key={i} className="flex flex-col gap-2 border-l-2 border-red-500 pl-3 py-1 bg-gray-900/40 rounded-r-lg">
-                          <div className="text-xs font-bold text-gray-200 truncate">{p?.name}</div>
-                          <div className="text-[9px] mono text-red-300 line-clamp-2 italic">
-                             "{r.proof}"
-                          </div>
-                       </div>
-                    );
-                 })}
-                 {results.filter(r => r.status === 'passed').length === 0 && (
-                    <div className="text-[10px] text-gray-500 italic">No exposures detected.</div>
+           </div>
+
+           <div className="bg-gray-800 p-8 rounded-2xl border border-gray-700 print:bg-white print:border-gray-200">
+              <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-6 leading-normal">Identified Agents</h3>
+              <div className="space-y-3">
+                 {uniqueAgents.map((agent, i) => (
+                   <div key={i} className="flex items-center justify-between p-4 bg-gray-900/50 rounded-xl border border-gray-700 group hover:border-blue-500/30 transition-all cursor-default print:bg-gray-50 print:border-gray-200">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-blue-600/10 flex items-center justify-center text-blue-500 print:bg-blue-600 print:text-white">
+                           <CheckCircle2 size={16} />
+                        </div>
+                        <span className="text-[11px] font-bold text-gray-200 print:text-black leading-normal">{agent}</span>
+                      </div>
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-lg shadow-green-500/50 print:bg-green-600 print:animate-none print:shadow-none" />
+                   </div>
+                 ))}
+                 {uniqueAgents.length === 0 && (
+                   <div className="text-center py-6 border-2 border-dashed border-gray-800 rounded-xl text-[10px] text-gray-600 font-bold uppercase tracking-widest print:border-gray-200">
+                     No active agents detected
+                   </div>
                  )}
               </div>
            </div>
         </div>
       </div>
 
-      <div className="bg-gray-800 rounded-2xl lg:rounded-3xl border border-gray-700 overflow-hidden">
-        <div className="p-5 lg:p-8 border-b border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-900/30">
-          <div>
-            <h3 className="text-lg lg:text-xl font-bold">Event Evidence Ledger</h3>
-            <p className="text-[10px] lg:text-xs text-gray-500 mt-1">Proof of penetration for each vector.</p>
-          </div>
+      <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden shadow-2xl print:shadow-none print:bg-white print:border-gray-200">
+        <div className="p-8 bg-gray-900/50 border-b border-gray-700 flex items-center justify-between print:bg-gray-50">
+           <h3 className="text-xl font-black uppercase tracking-tight leading-normal">Technical Evidence Ledger</h3>
+           <FileText size={20} className="text-gray-500" />
         </div>
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left text-xs min-w-[600px]">
-            <thead className="bg-gray-900/50 text-gray-400 font-bold uppercase tracking-wider text-[9px]">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-[11px]">
+            <thead className="bg-gray-950/80 text-gray-500 uppercase tracking-widest text-[9px] font-black print:bg-gray-100">
               <tr>
-                <th className="px-6 py-4">Test Vector</th>
-                <th className="px-6 py-4">Captured Proof</th>
-                <th className="px-6 py-4">Outcome</th>
-                <th className="px-6 py-4 text-right">Time</th>
+                <th className="px-8 py-5">Attack Vector</th>
+                <th className="px-8 py-5">Forensic Capture</th>
+                <th className="px-8 py-5">Interception Point</th>
+                <th className="px-8 py-5 text-right">Latency</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-700/50">
-              {results.map((res, i) => {
-                const p = TEST_PAYLOADS.find(x => x.id === res.testId);
-                return (
-                  <tr key={i} className="hover:bg-gray-700/30 transition-colors">
-                    <td className="px-6 py-4">
-                       <div className="font-bold text-gray-100">{p?.name}</div>
-                       <div className="text-[9px] text-gray-500 uppercase tracking-tighter">{p?.category}</div>
-                    </td>
-                    <td className="px-6 py-4 max-w-xs">
-                       {res.proof ? (
-                         <div className="flex items-center gap-2 text-red-400 font-mono text-[9px]">
-                           <Terminal size={10} />
-                           <span className="truncate">{res.proof}</span>
-                         </div>
-                       ) : (
-                         <span className="text-gray-600 italic text-[9px]">No data leaked</span>
-                       )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 rounded-md text-[9px] font-black ${res.status === 'blocked' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                        {res.status.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right text-gray-600 font-mono text-[9px] whitespace-nowrap">
-                      {new Date(res.timestamp).toLocaleTimeString()}
-                    </td>
-                  </tr>
-                );
-              })}
+            <tbody className="divide-y divide-gray-700/50 print:divide-gray-200">
+              {results.map((res, i) => (
+                <tr key={i} className="hover:bg-gray-700/30 transition-all group print:hover:bg-transparent">
+                  <td className="px-8 py-5">
+                    <div className="font-bold text-gray-100 print:text-black leading-normal">{TEST_PAYLOADS.find(p => p.id === res.testId)?.name}</div>
+                    <div className="text-[10px] text-gray-500 font-bold mt-1 uppercase tracking-normal leading-normal">
+                      {TEST_PAYLOADS.find(p => p.id === res.testId)?.category}
+                    </div>
+                  </td>
+                  <td className="px-8 py-5 max-w-lg">
+                    <div className={`font-mono text-[10px] p-4 rounded-lg border shadow-inner whitespace-pre-wrap break-all leading-relaxed ${res.status === 'blocked' ? 'bg-green-950/10 border-green-900/30 text-green-300 print:bg-green-50 print:text-green-800 print:border-green-200' : 'bg-red-950/10 border-red-900/30 text-red-300 print:bg-red-50 print:text-red-800 print:border-red-200'}`}>
+                       {res.proof}
+                    </div>
+                  </td>
+                  <td className="px-8 py-5">
+                    <div className="flex items-center gap-2">
+                       <Shield size={12} className={res.status === 'blocked' ? 'text-green-500' : 'text-red-500'} />
+                       <span className="text-[11px] font-black uppercase tracking-normal text-blue-400 print:text-blue-700 leading-normal">
+                         {res.blockingAgent || 'Endpoint Server'}
+                       </span>
+                    </div>
+                  </td>
+                  <td className="px-8 py-5 text-right font-mono text-gray-500 group-hover:text-blue-400 transition-colors print:text-black leading-normal">
+                    {res.responseTime}ms
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
+      </div>
+      
+      <div className="hidden print:block text-center mt-12 border-t pt-8 text-gray-400 font-mono text-[8px] uppercase tracking-widest">
+        Confidential Security Forensic Audit • Generated by Sentinela Lab Intelligence • Page 1
       </div>
     </div>
   );

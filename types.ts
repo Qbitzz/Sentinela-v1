@@ -7,9 +7,8 @@ export enum TestCategory {
   MALWARE = 'Malware Simulation',
   EXFIL = 'Data Exfiltration',
   POST_EXPLOIT = 'Post-Exploitation',
-  EDR = 'EDR Specific',
-  API = 'API Security',
-  EVASION = 'Encoding Evasion'
+  EVASION = 'Encoding Evasion',
+  BOT = 'Bot & Automation'
 }
 
 export enum TestStatus {
@@ -38,7 +37,10 @@ export interface TestResult {
   timestamp: string;
   details?: string;
   responseTime?: number;
-  proof?: string; // Captured response data as evidence
+  proof?: string; 
+  blockingAgent?: string; // Identified firewall/security software
+  targetIp?: string;
+  path?: ('Source' | 'Perimeter' | 'Destination')[];
 }
 
 export interface ReportSummary {

