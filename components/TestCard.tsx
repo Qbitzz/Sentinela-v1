@@ -3,14 +3,15 @@ import React, { useState } from 'react';
 import { TestPayload, TestResult, TestStatus } from '../types';
 import { TestRunner } from '../services/testRunner';
 import { StatusBadge } from './ui/Badge';
-import { Terminal, Shield, Play, Copy, AlertCircle, Monitor, Globe, Check, X } from 'lucide-react';
+import { Terminal, Shield, Play, Copy, AlertCircle, Monitor, Globe, Check, X, HelpCircle } from 'lucide-react';
 
 interface Props {
   payload: TestPayload;
   onResult: (result: TestResult) => void;
+  targetUrl: string;
 }
 
-export const TestCard: React.FC<Props> = ({ payload, onResult }) => {
+export const TestCard: React.FC<Props> = ({ payload, onResult, targetUrl }) => {
   const [status, setStatus] = useState<TestStatus>(TestStatus.IDLE);
   const [lastResult, setLastResult] = useState<TestResult | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
@@ -18,7 +19,7 @@ export const TestCard: React.FC<Props> = ({ payload, onResult }) => {
   const handleRun = async () => {
     setIsConfirming(false);
     setStatus(TestStatus.RUNNING);
-    const result = await TestRunner.run(payload);
+    const result = await TestRunner.run(payload, targetUrl);
     setStatus(result.status);
     setLastResult(result);
     onResult(result);
@@ -67,25 +68,27 @@ export const TestCard: React.FC<Props> = ({ payload, onResult }) => {
             {payload.content.substring(0, 80)}{payload.content.length > 80 ? '...' : ''}
           </div>
         </div>
+
+        {status === TestStatus.PASSED && (
+          <div className="mt-4 p-3 bg-red-950/20 border border-red-900/50 rounded-lg animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-2 text-red-400 mb-1">
+              <AlertCircle size={14} />
+              <span className="text-[10px] font-bold uppercase">Security Gap Detected</span>
+            </div>
+            <p className="text-[10px] text-gray-400 leading-tight">
+              The payload was not blocked by your {payload.targetDevice}. Ensure SSL Inspection is active and signatures are up-to-date.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="bg-gray-900/50 px-5 py-3 border-t border-gray-700 flex items-center justify-between mt-auto min-h-[52px]">
         {isConfirming ? (
           <div className="flex items-center gap-4 w-full justify-between animate-in fade-in slide-in-from-right-2 duration-200">
-            <span className="text-xs font-bold text-orange-400">Confirm trigger?</span>
+            <span className="text-xs font-bold text-orange-400">Trigger Attack?</span>
             <div className="flex gap-2">
-              <button 
-                onClick={handleRun}
-                className="p-1.5 bg-green-600 hover:bg-green-500 text-white rounded-md transition-colors"
-              >
-                <Check size={16} />
-              </button>
-              <button 
-                onClick={() => setIsConfirming(false)}
-                className="p-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-md transition-colors"
-              >
-                <X size={16} />
-              </button>
+              <button onClick={handleRun} className="p-1.5 bg-green-600 hover:bg-green-500 text-white rounded-md transition-colors"><Check size={16} /></button>
+              <button onClick={() => setIsConfirming(false)} className="p-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-md transition-colors"><X size={16} /></button>
             </div>
           </div>
         ) : (
@@ -96,19 +99,17 @@ export const TestCard: React.FC<Props> = ({ payload, onResult }) => {
               className="flex items-center gap-2 text-sm font-semibold text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors"
             >
               <Play size={14} />
-              {status === TestStatus.RUNNING ? 'Testing...' : 'Execute Test'}
+              {status === TestStatus.RUNNING ? 'Testing...' : 'Execute Vector'}
             </button>
             
             <div className="flex gap-2">
-              {(payload.type === 'script' || payload.type === 'download') && (
-                <button 
-                  onClick={() => navigator.clipboard.writeText(payload.content)}
-                  className="p-1.5 text-gray-500 hover:text-gray-300 transition-colors"
-                  title="Copy Payload"
-                >
-                  <Copy size={16} />
-                </button>
-              )}
+              <div className="group/help relative">
+                <HelpCircle size={16} className="text-gray-600 hover:text-gray-400 cursor-help" />
+                <div className="absolute bottom-full right-0 mb-2 w-64 bg-gray-950 text-[10px] p-3 rounded shadow-2xl invisible group-hover/help:visible z-10 border border-gray-800 text-gray-400">
+                  <span className="font-bold text-blue-400 block mb-1">Methodology:</span>
+                  This test sends the malicious string to <span className="text-white font-mono">{targetUrl}</span>. If your firewall allows the request to complete, the test shows 'Passed' (Security Failure).
+                </div>
+              </div>
               {lastResult && (
                  <div className="group/info relative">
                    <AlertCircle size={16} className="text-gray-500 cursor-help" />

@@ -2,39 +2,42 @@
 import { TestPayload, TestResult, TestStatus } from "../types";
 
 export class TestRunner {
-  static async run(payload: TestPayload): Promise<TestResult> {
+  static async run(payload: TestPayload, targetUrl: string): Promise<TestResult> {
     const startTime = Date.now();
+    const baseUrl = targetUrl.replace(/\/$/, "");
     
     try {
       if (payload.type === 'network') {
-        // Simulate a real request to the current URL with the payload as a parameter
-        // Most WAFs/NGFWs will inspect parameters
-        const response = await fetch(`${window.location.origin}/?test=${encodeURIComponent(payload.content)}`, {
-          method: 'GET',
-          // We don't want caching to interfere
-          headers: { 'Cache-Control': 'no-cache' }
-        });
+        // We append the payload as a query parameter or header. 
+        // Most NGFWs/WAFs inspect these areas for signatures.
+        const url = `${baseUrl}/?sentinela_test_id=${payload.id}&vector=${encodeURIComponent(payload.content)}`;
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        // If the request is blocked, it's a "success" for the firewall
-        if (response.status === 403 || response.status === 406 || response.status === 0) {
-          return {
-            testId: payload.id,
-            status: TestStatus.BLOCKED,
-            timestamp: new Date().toISOString(),
-            responseTime: Date.now() - startTime,
-            details: `Server returned status ${response.status}. Payload effectively blocked.`
-          };
-        } else {
-          return {
-            testId: payload.id,
-            status: TestStatus.PASSED, // Threat got through!
-            timestamp: new Date().toISOString(),
-            responseTime: Date.now() - startTime,
-            details: `Server returned ${response.status}. WAF/NGFW failed to intercept.`
-          };
-        }
+        const response = await fetch(url, {
+          method: 'GET',
+          mode: 'no-cors', // Essential for cross-origin testing without server-side CORS config
+          headers: { 
+            'Cache-Control': 'no-cache',
+            'X-Sentinela-Payload': payload.content,
+            'User-Agent': 'Sentinela-Security-Scanner/1.0'
+          },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        // With mode 'no-cors', type is 'opaque'. 
+        // If the firewall resets the connection, the fetch usually fails and goes to 'catch'.
+        // If it returns a response (even opaque), it likely got through unless status is 403.
+        return {
+          testId: payload.id,
+          status: TestStatus.PASSED,
+          timestamp: new Date().toISOString(),
+          responseTime: Date.now() - startTime,
+          details: `Request reached destination. Security control failed to intercept this signature.`
+        };
       } else if (payload.type === 'download') {
-        // Trigger a download. The user's EDR/AV should flag this if it's scanning downloads.
         const blob = new Blob([payload.content], { type: 'text/plain' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -47,19 +50,17 @@ export class TestRunner {
 
         return {
           testId: payload.id,
-          status: TestStatus.PASSED, // We assume "Passed" until the user confirms detection
+          status: TestStatus.PASSED,
           timestamp: new Date().toISOString(),
-          details: "Download triggered. Check endpoint logs for quarantine events."
+          details: "File download initiated. Check your EDR/AV for real-time quarantine events."
         };
       } else if (payload.type === 'script') {
-        // For script-based, we'll "copy to clipboard" and ask the user to run it
-        // Or simulate a specific behavior that EDR monitors (e.g., rapid file access)
         await navigator.clipboard.writeText(payload.content);
         return {
           testId: payload.id,
           status: TestStatus.IDLE,
           timestamp: new Date().toISOString(),
-          details: "Script payload copied to clipboard. Execute in a safe VM to test EDR."
+          details: "Behavioral payload copied to clipboard. Execute this in a Terminal on the target machine to test EDR heuristics."
         };
       }
       
@@ -70,13 +71,14 @@ export class TestRunner {
         details: "Unsupported test type."
       };
     } catch (error: any) {
-      // Fetch errors (like CORS or Connection Refused) are often signs of network-level blocking
+      // In web-based security testing, a 'TypeError: Failed to fetch' or AbortError 
+      // is the standard signal that a Network Firewall (NGFW) has dropped the packet or sent a TCP Reset.
       return {
         testId: payload.id,
         status: TestStatus.BLOCKED,
         timestamp: new Date().toISOString(),
         responseTime: Date.now() - startTime,
-        details: `Connection error: ${error.message}. Likely blocked by network firewall.`
+        details: `CONNECTION TERMINATED: ${error.name}. The payload was likely dropped or rejected by the NGFW/IPS engine.`
       };
     }
   }
