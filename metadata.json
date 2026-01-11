@@ -1,0 +1,8 @@
+{
+  "name": "Sentinela - NGFW & EDR Testing Suite",
+  "description": "A comprehensive security testing platform designed to validate Next-Generation Firewall and Endpoint Detection and Response capabilities through simulated attack vectors and automated reporting.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
