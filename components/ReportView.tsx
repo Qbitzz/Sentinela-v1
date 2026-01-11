@@ -6,7 +6,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip, 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis 
 } from 'recharts';
-import { ShieldCheck, ShieldAlert, FileText, Zap, Activity, Target, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, FileText, Zap, Activity, Target, AlertTriangle, Terminal } from 'lucide-react';
 
 interface Props {
   summary: ReportSummary;
@@ -37,7 +37,7 @@ export const ReportView: React.FC<Props> = ({ summary, results }) => {
   };
 
   return (
-    <div className="space-y-6 lg:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6 lg:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
       {/* Top Cards Header */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-gray-800 p-5 lg:p-6 rounded-2xl border border-gray-700">
@@ -80,17 +80,13 @@ export const ReportView: React.FC<Props> = ({ summary, results }) => {
         </div>
       </div>
 
-      {/* Main Analysis Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
         <div className="lg:col-span-2 space-y-6 lg:space-y-8">
           <div className="bg-gray-800 p-6 lg:p-8 rounded-2xl border border-gray-700 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 lg:p-8 opacity-5">
-               <Zap size={100} className="text-blue-400 lg:w-[160px] lg:h-[160px]" />
-            </div>
             <h3 className="text-lg lg:text-xl font-bold mb-6 flex items-center gap-3">
-              <Zap size={18} className="text-blue-400" /> AI Insights
+              <Zap size={18} className="text-blue-400" /> Posture Analysis
             </h3>
-            <div className="text-xs lg:text-sm text-gray-300 leading-relaxed whitespace-pre-line z-10 relative">
+            <div className="text-xs lg:text-sm text-gray-300 leading-relaxed font-mono whitespace-pre-line z-10 relative bg-gray-900/50 p-4 rounded-xl border border-gray-700">
               {summary.aiAnalysis}
             </div>
           </div>
@@ -120,7 +116,7 @@ export const ReportView: React.FC<Props> = ({ summary, results }) => {
               <div className="h-48 lg:h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={pieData} innerRadius={40} lg:innerRadius={60} outerRadius={60} lg:outerRadius={80} paddingAngle={5} dataKey="value">
+                    <Pie data={pieData} innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value">
                       {pieData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
                     </Pie>
                     <Tooltip contentStyle={{ backgroundColor: '#111827', border: '1px solid #374151', borderRadius: '8px', fontSize: '10px' }} />
@@ -143,44 +139,40 @@ export const ReportView: React.FC<Props> = ({ summary, results }) => {
               <div className="absolute top-2 right-2">
                  <AlertTriangle size={14} className="text-red-500 opacity-30" />
               </div>
-              <h3 className="text-[10px] font-bold text-gray-400 mb-6 uppercase tracking-widest">Top Risks</h3>
+              <h3 className="text-[10px] font-bold text-gray-400 mb-6 uppercase tracking-widest">Exposed Data Proof</h3>
               <div className="space-y-4">
-                 {results.filter(r => r.status === 'passed').slice(0, 3).map((r, i) => {
+                 {results.filter(r => r.status === 'passed' && r.proof).slice(0, 3).map((r, i) => {
                     const p = TEST_PAYLOADS.find(x => x.id === r.testId);
                     return (
-                       <div key={i} className="flex gap-3 items-start border-l-2 border-red-500 pl-3 py-0.5">
-                          <div className="min-w-0">
-                             <div className="text-xs lg:text-sm font-bold text-gray-200 truncate">{p?.name}</div>
-                             <div className="text-[9px] text-gray-500 truncate">{p?.category}</div>
+                       <div key={i} className="flex flex-col gap-2 border-l-2 border-red-500 pl-3 py-1 bg-gray-900/40 rounded-r-lg">
+                          <div className="text-xs font-bold text-gray-200 truncate">{p?.name}</div>
+                          <div className="text-[9px] mono text-red-300 line-clamp-2 italic">
+                             "{r.proof}"
                           </div>
                        </div>
                     );
                  })}
                  {results.filter(r => r.status === 'passed').length === 0 && (
-                    <div className="text-[10px] text-gray-500 italic">No evasions detected.</div>
+                    <div className="text-[10px] text-gray-500 italic">No exposures detected.</div>
                  )}
               </div>
            </div>
         </div>
       </div>
 
-      {/* Log Table Section */}
       <div className="bg-gray-800 rounded-2xl lg:rounded-3xl border border-gray-700 overflow-hidden">
         <div className="p-5 lg:p-8 border-b border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-900/30">
           <div>
-            <h3 className="text-lg lg:text-xl font-bold">Event Ledger</h3>
-            <p className="text-[10px] lg:text-xs text-gray-500 mt-1">Telemetry log for all vectors.</p>
+            <h3 className="text-lg lg:text-xl font-bold">Event Evidence Ledger</h3>
+            <p className="text-[10px] lg:text-xs text-gray-500 mt-1">Proof of penetration for each vector.</p>
           </div>
-          <button className="w-full sm:w-auto px-4 py-2 text-[10px] bg-gray-900 hover:bg-black border border-gray-700 rounded-xl text-gray-300 transition-all flex items-center justify-center gap-2">
-            <FileText size={14} className="text-blue-500" /> Export JSON
-          </button>
         </div>
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left text-xs min-w-[600px]">
             <thead className="bg-gray-900/50 text-gray-400 font-bold uppercase tracking-wider text-[9px]">
               <tr>
                 <th className="px-6 py-4">Test Vector</th>
-                <th className="px-6 py-4">Platform</th>
+                <th className="px-6 py-4">Captured Proof</th>
                 <th className="px-6 py-4">Outcome</th>
                 <th className="px-6 py-4 text-right">Time</th>
               </tr>
@@ -190,22 +182,27 @@ export const ReportView: React.FC<Props> = ({ summary, results }) => {
                 const p = TEST_PAYLOADS.find(x => x.id === res.testId);
                 return (
                   <tr key={i} className="hover:bg-gray-700/30 transition-colors">
-                    <td className="px-6 py-3">
+                    <td className="px-6 py-4">
                        <div className="font-bold text-gray-100">{p?.name}</div>
                        <div className="text-[9px] text-gray-500 uppercase tracking-tighter">{p?.category}</div>
                     </td>
-                    <td className="px-6 py-3">
-                       <span className={`text-[8px] font-black px-1.5 py-0.5 border rounded uppercase ${p?.targetDevice === 'NGFW' ? 'text-orange-400 border-orange-900/30' : 'text-purple-400 border-purple-900/30'}`}>
-                          {p?.targetDevice}
-                       </span>
+                    <td className="px-6 py-4 max-w-xs">
+                       {res.proof ? (
+                         <div className="flex items-center gap-2 text-red-400 font-mono text-[9px]">
+                           <Terminal size={10} />
+                           <span className="truncate">{res.proof}</span>
+                         </div>
+                       ) : (
+                         <span className="text-gray-600 italic text-[9px]">No data leaked</span>
+                       )}
                     </td>
-                    <td className="px-6 py-3">
+                    <td className="px-6 py-4">
                       <span className={`px-2 py-0.5 rounded-md text-[9px] font-black ${res.status === 'blocked' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
                         {res.status.toUpperCase()}
                       </span>
                     </td>
-                    <td className="px-6 py-3 text-right text-gray-600 font-mono text-[9px] whitespace-nowrap">
-                      {new Date(res.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    <td className="px-6 py-4 text-right text-gray-600 font-mono text-[9px] whitespace-nowrap">
+                      {new Date(res.timestamp).toLocaleTimeString()}
                     </td>
                   </tr>
                 );

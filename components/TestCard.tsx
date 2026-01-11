@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { TestPayload, TestResult, TestStatus } from '../types';
 import { TestRunner } from '../services/testRunner';
 import { StatusBadge } from './ui/Badge';
-import { Play, AlertCircle, Monitor, Globe, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Play, AlertCircle, Monitor, Globe, Check, X, ChevronDown, ChevronUp, Terminal } from 'lucide-react';
 
 interface Props {
   payload: TestPayload;
@@ -35,7 +35,7 @@ export const TestCard: React.FC<Props> = ({ payload, onResult, targetUrl }) => {
   };
 
   return (
-    <div className={`bg-gray-800 border ${status === TestStatus.PASSED ? 'border-red-900/50 shadow-lg shadow-red-950/10' : 'border-gray-700'} rounded-xl overflow-hidden hover:border-gray-500 transition-all group flex flex-col h-full`}>
+    <div className={`bg-gray-800 border ${status === TestStatus.PASSED ? 'border-red-600/50 shadow-lg shadow-red-950/20' : 'border-gray-700'} rounded-xl overflow-hidden hover:border-gray-500 transition-all group flex flex-col h-full`}>
       <div className="p-5 flex-1">
         <div className="flex justify-between items-start mb-4">
           <div className="flex items-center gap-3">
@@ -58,6 +58,17 @@ export const TestCard: React.FC<Props> = ({ payload, onResult, targetUrl }) => {
           {payload.description}
         </p>
 
+        {status === TestStatus.PASSED && lastResult?.proof && (
+          <div className="mb-4 space-y-2">
+            <div className="flex items-center gap-1.5 text-red-400 text-[10px] font-black uppercase">
+              <Terminal size={12} /> Proof of Exploitation:
+            </div>
+            <div className="bg-red-950/30 border border-red-900/50 rounded p-2 text-[9px] mono text-red-200 overflow-hidden break-all whitespace-pre-wrap max-h-24 overflow-y-auto custom-scrollbar">
+              {lastResult.proof}
+            </div>
+          </div>
+        )}
+
         <div className="bg-gray-950 rounded p-2 text-[9px] mono text-gray-500 break-all border border-gray-900/50 mb-4">
           Vector: {payload.content.substring(0, 100)}{payload.content.length > 100 ? '...' : ''}
         </div>
@@ -74,7 +85,7 @@ export const TestCard: React.FC<Props> = ({ payload, onResult, targetUrl }) => {
             {showDetails && (
               <div className="mt-2 p-3 bg-gray-900 rounded text-[10px] text-gray-400 border border-gray-800 animate-in slide-in-from-top-1 duration-200">
                 {lastResult.details}
-                {lastResult.responseTime && <div className="mt-2 text-blue-500 font-mono">Response Time: {lastResult.responseTime}ms</div>}
+                {lastResult.responseTime && <div className="mt-2 text-blue-500 font-mono">RTT: {lastResult.responseTime}ms</div>}
               </div>
             )}
           </div>
@@ -84,7 +95,7 @@ export const TestCard: React.FC<Props> = ({ payload, onResult, targetUrl }) => {
       <div className="bg-gray-900/50 px-5 py-3 border-t border-gray-700 flex items-center justify-between min-h-[52px]">
         {isConfirming ? (
           <div className="flex items-center gap-4 w-full justify-between animate-in fade-in slide-in-from-right-2 duration-200">
-            <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">Execute Malicious Vector?</span>
+            <span className="text-[10px] font-bold text-orange-400 uppercase tracking-wider">Trigger Attack?</span>
             <div className="flex gap-2">
               <button onClick={handleRun} className="p-1.5 bg-red-600 hover:bg-red-500 text-white rounded-md transition-colors"><Check size={14} /></button>
               <button onClick={() => setIsConfirming(false)} className="p-1.5 bg-gray-700 hover:bg-gray-600 text-white rounded-md transition-colors"><X size={14} /></button>
@@ -98,13 +109,13 @@ export const TestCard: React.FC<Props> = ({ payload, onResult, targetUrl }) => {
               className="flex items-center gap-2 text-xs font-bold text-blue-400 hover:text-blue-300 disabled:opacity-50 transition-colors uppercase tracking-widest"
             >
               <Play size={12} fill="currentColor" />
-              {status === TestStatus.RUNNING ? 'Analyzing...' : 'Execute'}
+              {status === TestStatus.RUNNING ? 'Attacking...' : 'Execute Vector'}
             </button>
             
             {status === TestStatus.PASSED && (
               <div className="flex items-center gap-1 text-red-500 animate-pulse">
                 <AlertCircle size={14} />
-                <span className="text-[9px] font-black uppercase">Vulnerable</span>
+                <span className="text-[9px] font-black uppercase">Exposed</span>
               </div>
             )}
           </>

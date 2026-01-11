@@ -4,41 +4,42 @@ import { TEST_PAYLOADS } from "../constants";
 
 export class SecurityAnalysisService {
   /**
-   * Generates a security assessment report locally without AI.
+   * Generates a security assessment report locally.
    */
   async generateReport(results: TestResult[]): Promise<ReportSummary> {
     const total = results.length;
     const blockedCount = results.filter(r => r.status === TestStatus.BLOCKED).length;
     const passedCount = results.filter(r => r.status === TestStatus.PASSED).length;
     
-    // Calculate score based on blocked vs total attempted
     const score = total > 0 ? Math.round((blockedCount / total) * 100) : 0;
     
     let overallHealth: 'Critical' | 'Moderate' | 'Good' = 'Critical';
     if (score >= 80) overallHealth = 'Good';
     else if (score >= 50) overallHealth = 'Moderate';
 
-    // Generate technical insights based on results
-    let insights = `LOCAL ANALYSIS REPORT\nGenerated: ${new Date().toLocaleString()}\n\n`;
+    let insights = `POSTURE ASSESSMENT REPORT\nGenerated: ${new Date().toLocaleString()}\n\n`;
     
     const gaps = results.filter(r => r.status === TestStatus.PASSED);
     if (gaps.length > 0) {
-      insights += "VULNERABILITY SUMMARY:\n";
+      insights += "CRITICAL EXPOSURES FOUND:\n";
       gaps.forEach(gap => {
         const p = TEST_PAYLOADS.find(x => x.id === gap.testId);
-        insights += `- [${p?.targetDevice}] ${p?.name}: The security control failed to inspect and block this payload. `;
-        if (p?.category === TestCategory.WAF) insights += "Check WAF signature updates and SSL decryption policies.\n";
-        else if (p?.category === TestCategory.EDR) insights += "Verify EDR behavioral heuristics and real-time protection state.\n";
-        else insights += "Review firewall IPS signatures for this specific attack vector.\n";
+        insights += `[!] ${p?.category} Bypass: ${p?.name}\n`;
+        if (gap.proof) {
+          insights += `    - EXPLOIT PROOF: "${gap.proof}"\n`;
+        }
+        insights += `    - IMPACT: Successful payload delivery to endpoint. Firewall/IPS ignored this signature.\n\n`;
       });
+    } else if (results.length > 0) {
+      insights += "POSTURE ALERT: All attempted vectors were successfully intercepted by your perimeter security controls.\n";
     } else {
-      insights += "POSTURE ALERT: No gaps detected in the attempted vectors. Your security controls successfully intercepted all signatures.\n";
+      insights += "No test results available for analysis.\n";
     }
 
-    insights += "\nREMEDIATION STEPS:\n";
-    insights += "1. Enable Deep Packet Inspection (DPI-SSL) to unmask encrypted threats.\n";
-    insights += "2. Transition NGFW from 'Detection Only' to 'Prevention/Block' mode.\n";
-    insights += "3. Audit firewall logs for 'TCP Reset' events corresponding to these tests.\n";
+    insights += "TECHNICAL RECOMMENDATIONS:\n";
+    insights += "1. Inspect firewall logs for specific vector signatures that bypassed the filter.\n";
+    insights += "2. Verify if the target application handles input sanitization to provide 'Defense in Depth'.\n";
+    insights += "3. Ensure that your NGFW has SSL/TLS Decryption enabled for the target IP.\n";
 
     return {
       overallHealth,
