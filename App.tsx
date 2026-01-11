@@ -5,10 +5,11 @@ import { TestResult, ReportSummary, TestCategory, TestStatus } from './types';
 import { TestCard } from './components/TestCard';
 import { ReportView } from './components/ReportView';
 import { SecurityAnalysisService } from './services/geminiService';
+import { TestRunner } from './services/testRunner';
 import { 
   Shield, LayoutDashboard, Database, Activity, FileCheck, 
-  ChevronRight, Menu, X, Loader2, Search, BookOpen, 
-  Info, CheckCircle2, AlertTriangle, ShieldAlert, Eye, Terminal, Network, Fingerprint, Bug, Settings, Globe
+  Menu, X, Loader2, Search, BookOpen, 
+  Info, CheckCircle2, ShieldAlert, Eye, Terminal, Network, Globe, AlertCircle, Wifi, WifiOff
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -21,18 +22,22 @@ const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showGuide, setShowGuide] = useState(false);
   
-  // The target for network-based attacks
-  const [targetUrl, setTargetUrl] = useState(window.location.origin);
+  const [targetUrl, setTargetUrl] = useState('https://httpbin.org/get');
+  const [isTargetOnline, setIsTargetOnline] = useState<boolean | null>(null);
+  const [isCheckingTarget, setIsCheckingTarget] = useState(false);
 
   const analysisService = useMemo(() => new SecurityAnalysisService(), []);
 
+  const checkConnectivity = async () => {
+    setIsCheckingTarget(true);
+    const online = await TestRunner.checkConnectivity(targetUrl);
+    setIsTargetOnline(online);
+    setIsCheckingTarget(false);
+  };
+
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) setIsSidebarOpen(false);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    checkConnectivity();
+  }, [targetUrl]);
 
   const handleTestResult = (result: TestResult) => {
     setResults(prev => {
@@ -49,23 +54,10 @@ const App: React.FC = () => {
   const generateReport = async () => {
     if (results.length === 0) return;
     setIsAnalyzing(true);
-    try {
-      const summary = await analysisService.generateReport(results);
-      setReport(summary);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const showPreviewReport = () => {
-    const mockReport: ReportSummary = {
-      overallHealth: 'Moderate',
-      score: 65,
-      blockedCount: results.filter(r => r.status === TestStatus.BLOCKED).length || 12,
-      passedCount: results.filter(r => r.status === TestStatus.PASSED).length || 4,
-      aiAnalysis: "PREVIEW MODE: This is a simulated analysis based on current security trends. In a live environment, this section would contain deep forensics provided by the Gemini Engine, highlighting gaps in SSL inspection and behavioral heuristics."
-    };
-    setReport(mockReport);
+    // Deterministic local report generation
+    const summary = await analysisService.generateReport(results);
+    setReport(summary);
+    setIsAnalyzing(false);
   };
 
   const filteredPayloads = useMemo(() => {
@@ -73,8 +65,7 @@ const App: React.FC = () => {
       const matchesCategory = activeTab === 'all' || p.category === activeTab;
       const matchesSearch = 
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.content.toLowerCase().includes(searchQuery.toLowerCase());
+        p.description.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
   }, [activeTab, searchQuery]);
@@ -92,7 +83,7 @@ const App: React.FC = () => {
           <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/40 shrink-0">
             <Shield className="text-white" size={24} />
           </div>
-          {(isDesktopSidebarOpen || isSidebarOpen) && <span className="font-black text-xl tracking-tight">SENTINELA</span>}
+          {(isDesktopSidebarOpen || isSidebarOpen) && <span className="font-black text-xl tracking-tight uppercase">Sentinela</span>}
         </div>
 
         <nav className="flex-1 px-4 mt-8 space-y-1 overflow-y-auto custom-scrollbar">
@@ -130,65 +121,63 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 lg:gap-4">
-            <div className="flex items-center gap-2 bg-gray-900/50 border border-gray-800 rounded-lg px-2 py-1 lg:py-1.5">
-              <Globe size={14} className="text-blue-500 shrink-0" />
+            <div className="flex items-center gap-3 bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5">
               <div className="flex flex-col">
-                <span className="text-[8px] text-gray-500 font-bold uppercase leading-none mb-1">Target Endpoint</span>
-                <input 
-                  type="text" 
-                  value={targetUrl} 
-                  onChange={(e) => setTargetUrl(e.target.value)}
-                  className="bg-transparent border-none p-0 text-[10px] lg:text-xs text-blue-400 focus:ring-0 min-w-[150px] font-mono"
-                  placeholder="https://protected-server.local"
-                />
+                <span className="text-[8px] text-gray-500 font-bold uppercase mb-1">Target Connectivity</span>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    value={targetUrl} 
+                    onChange={(e) => setTargetUrl(e.target.value)}
+                    className="bg-transparent border-none p-0 text-[10px] lg:text-xs text-blue-400 focus:ring-0 min-w-[150px] font-mono"
+                  />
+                  {/* Fixed Lucide icon title prop error by wrapping in span with title attribute */}
+                  {isCheckingTarget ? (
+                    <Loader2 size={14} className="animate-spin text-gray-500" />
+                  ) : isTargetOnline ? (
+                    <span title="Target Reachable">
+                      <Wifi size={14} className="text-green-500" />
+                    </span>
+                  ) : (
+                    <span title="Target Unreachable">
+                      <WifiOff size={14} className="text-red-500" />
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button onClick={showPreviewReport} className="p-2 lg:px-4 lg:py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-semibold rounded-lg border border-gray-700 transition-all flex items-center gap-2">
-                <Eye size={16} />
-                <span className="hidden md:inline">Preview</span>
-              </button>
-              <button onClick={generateReport} disabled={results.length === 0 || isAnalyzing} className="px-3 py-2 lg:px-4 lg:py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-500 text-white text-xs lg:text-sm font-semibold rounded-lg shadow-lg shadow-blue-900/20 transition-all flex items-center gap-2">
-                {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <FileCheck size={16} />}
-                <span className="hidden sm:inline">Report</span>
-                <span className="sm:hidden">{results.length > 0 ? results.length : ''}</span>
-              </button>
-            </div>
+            <button onClick={generateReport} disabled={results.length === 0 || isAnalyzing} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-500 text-white text-xs lg:text-sm font-semibold rounded-lg shadow-lg shadow-blue-900/20 transition-all flex items-center gap-2">
+              {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <FileCheck size={16} />}
+              <span>Generate Analysis</span>
+            </button>
           </div>
         </header>
 
         <div className="p-4 lg:p-8 max-w-7xl mx-auto w-full flex-1">
           {report ? (
             <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="flex flex-col">
-                  <h2 className="text-xl lg:text-2xl font-black">Security Posture</h2>
-                  <p className="text-[10px] lg:text-xs text-gray-500 italic">Synthetic intelligence evaluation.</p>
-                </div>
-                <button onClick={() => setReport(null)} className="w-full sm:w-auto px-3 py-2 text-xs bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 transition-all flex items-center justify-center gap-2">
-                  <LayoutDashboard size={14} /> Back
-                </button>
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-black">Security Posture Report</h2>
+                <button onClick={() => setReport(null)} className="px-3 py-2 text-xs bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300">Back to Lab</button>
               </div>
               <ReportView summary={report} results={results} />
             </div>
           ) : (
             <>
-              <div className="mb-8 lg:mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div>
-                  <h2 className="text-2xl lg:text-4xl font-black tracking-tight mb-2 uppercase">Capability Validation</h2>
-                  <p className="text-sm lg:text-base text-gray-400 max-w-2xl">
-                    Attacking <span className="text-blue-400 font-mono text-xs">{targetUrl}</span>. Ensure your 
-                    <span className="text-orange-400 font-bold ml-1">NGFW</span> is in the path.
-                  </p>
-                </div>
-                <div className="bg-gray-900/80 border border-gray-800 rounded-xl px-4 py-3 flex items-center gap-3 self-start md:self-auto">
-                  <Activity className="text-blue-500" size={20} />
-                  <div>
-                    <div className="text-[10px] text-gray-500 uppercase font-bold">Execution Log</div>
-                    <div className="text-lg lg:text-xl font-bold font-mono">{results.length}</div>
-                  </div>
-                </div>
+              <div className="mb-8 lg:mb-12">
+                <h2 className="text-2xl lg:text-4xl font-black tracking-tight mb-2 uppercase flex items-center gap-3">
+                  Validation Lab
+                  {isTargetOnline === false && (
+                    <span className="flex items-center gap-1.5 px-2 py-1 bg-red-950/40 border border-red-900/50 rounded text-[10px] text-red-400 normal-case font-bold">
+                      <AlertCircle size={12} /> Target Unreachable
+                    </span>
+                  )}
+                </h2>
+                <p className="text-sm lg:text-base text-gray-400 max-w-2xl">
+                  Attempting vectors against <span className="text-blue-400 font-mono">{targetUrl}</span>. 
+                  If the target is offline, tests will show as 'Blocked' incorrectly.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
@@ -201,69 +190,33 @@ const App: React.FC = () => {
                   />
                 ))}
               </div>
-
-              {filteredPayloads.length === 0 && (
-                <div className="text-center py-16 lg:py-20 bg-gray-900/50 rounded-2xl border border-dashed border-gray-800">
-                  <ShieldAlert size={48} className="mx-auto text-gray-700 mb-4" />
-                  <h3 className="text-lg font-bold text-gray-400">No vectors matched</h3>
-                  <button onClick={() => {setSearchQuery(''); setActiveTab('all')}} className="mt-4 text-blue-400 hover:underline text-xs">Clear filters</button>
-                </div>
-              )}
             </>
           )}
         </div>
         
         <footer className="p-6 lg:p-8 border-t border-gray-900 text-center text-[10px] lg:text-xs text-gray-600">
-          <div className="flex flex-wrap justify-center gap-4 lg:gap-6 mb-4">
-            <span className="flex items-center gap-1"><Info size={14} /> Docs</span>
-            <span className="flex items-center gap-1"><Shield size={14} /> MITRE</span>
-          </div>
-          <p>© 2026 Sentinela. Professional Defensive Suite.</p>
-          <div className="mt-2 font-medium italic">By <span className="text-blue-400 font-bold">tegar</span> • <span className="text-orange-500 uppercase font-black tracking-tighter">testing phase</span></div>
+          <p>© 2026 Sentinela Validation Suite • Manual Testing Mode Enabled</p>
         </footer>
       </main>
 
       {showGuide && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 md:p-12">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-gray-950/95 backdrop-blur-md" onClick={() => setShowGuide(false)} />
-          <div className="relative bg-gray-900 border border-gray-800 w-full max-w-4xl h-full sm:h-auto sm:max-h-[90vh] overflow-hidden sm:rounded-3xl shadow-2xl flex flex-col animate-in fade-in zoom-in duration-300">
-            <div className="p-4 lg:p-8 border-b border-gray-800 bg-gray-900/50 flex justify-between items-center">
-              <div className="flex items-center gap-3 lg:gap-4">
-                <div className="p-2 lg:p-3 bg-blue-600 rounded-lg lg:rounded-xl"><BookOpen size={20} className="text-white lg:w-6 lg:h-6" /></div>
-                <div>
-                  <h3 className="text-lg lg:text-2xl font-black">Field Manual</h3>
-                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Methodology v2.6</p>
-                </div>
-              </div>
-              <button onClick={() => setShowGuide(false)} className="p-2 hover:bg-gray-800 rounded-full text-gray-400 hover:text-white transition-all"><X size={24} /></button>
+          <div className="relative bg-gray-900 border border-gray-800 w-full max-w-2xl rounded-3xl p-8 animate-in fade-in zoom-in duration-300">
+            <h3 className="text-2xl font-black mb-4 flex items-center gap-3"><Terminal size={24} className="text-blue-500" /> Lab Field Manual</h3>
+            <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
+              <p>1. <strong className="text-white">Verify Connectivity:</strong> Ensure the icon in the header is green. If it's red, your network or target is down.</p>
+              <p>2. <strong className="text-white">Trigger Vectors:</strong> Execute individual attacks. WAF/IPS tests send network packets. Malware tests simulate file drops.</p>
+              <p>3. <strong className="text-white">Interpreting Results:</strong></p>
+              <ul className="pl-4 border-l border-gray-800 space-y-2">
+                <li><span className="text-red-400 font-bold">PASSED:</span> The security control FAILED. The threat reached the target.</li>
+                <li><span className="text-green-400 font-bold">BLOCKED:</span> The security control SUCCESS. The connection was terminated or timed out.</li>
+              </ul>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 lg:p-8 space-y-8 lg:space-y-12 custom-scrollbar">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-10">
-                <section>
-                  <h4 className="text-[10px] lg:text-sm font-black text-blue-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2"><Terminal size={14} /> 01. Setup</h4>
-                  <div className="space-y-3 text-xs lg:text-sm text-gray-400 leading-relaxed">
-                    <p>Use a <span className="text-white">Hardened Lab VM</span>. The target must be behind your NGFW.</p>
-                    <ul className="space-y-2">
-                      <li className="flex gap-2"><CheckCircle2 size={14} className="text-green-500 shrink-0 mt-0.5" /><span>Enable SSL Inspection for HTTPS vectors.</span></li>
-                      <li className="flex gap-2"><CheckCircle2 size={14} className="text-green-500 shrink-0 mt-0.5" /><span>Set your NGFW to 'Prevention' mode.</span></li>
-                    </ul>
-                  </div>
-                </section>
-                <section>
-                  <h4 className="text-[10px] lg:text-sm font-black text-orange-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2"><Network size={14} /> 02. NGFW Logic</h4>
-                  <div className="space-y-3 text-xs lg:text-sm text-gray-400 leading-relaxed">
-                    <p>A <span className="text-red-400">PASSED</span> test means the exploit reached the server (Firewall Failed). A <span className="text-green-400">BLOCKED</span> test means the connection was dropped (Firewall Success).</p>
-                  </div>
-                </section>
-              </div>
-            </div>
-            <div className="p-4 lg:p-6 bg-gray-900 border-t border-gray-800 flex items-center justify-between mt-auto">
-              <button onClick={() => setShowGuide(false)} className="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition-all">I Understand</button>
-            </div>
+            <button onClick={() => setShowGuide(false)} className="mt-8 w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition-all">Begin Testing</button>
           </div>
         </div>
       )}
-      <style>{`.custom-scrollbar::-webkit-scrollbar { width: 4px; } .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } .custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border-radius: 10px; }`}</style>
     </div>
   );
 };

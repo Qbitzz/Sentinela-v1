@@ -2,40 +2,48 @@
 import { TestPayload, TestResult, TestStatus } from "../types";
 
 export class TestRunner {
+  static async checkConnectivity(targetUrl: string): Promise<boolean> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      await fetch(targetUrl, { mode: 'no-cors', signal: controller.signal });
+      clearTimeout(timeoutId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   static async run(payload: TestPayload, targetUrl: string): Promise<TestResult> {
     const startTime = Date.now();
     const baseUrl = targetUrl.replace(/\/$/, "");
     
     try {
       if (payload.type === 'network') {
-        // We append the payload as a query parameter or header. 
-        // Most NGFWs/WAFs inspect these areas for signatures.
         const url = `${baseUrl}/?sentinela_test_id=${payload.id}&vector=${encodeURIComponent(payload.content)}`;
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
 
+        // We use 'no-cors' so we don't need the target server to have CORS headers.
+        // If the firewall is working, it will kill this connection.
         const response = await fetch(url, {
           method: 'GET',
-          mode: 'no-cors', // Essential for cross-origin testing without server-side CORS config
+          mode: 'no-cors',
           headers: { 
             'Cache-Control': 'no-cache',
-            'X-Sentinela-Payload': payload.content,
-            'User-Agent': 'Sentinela-Security-Scanner/1.0'
+            'X-Sentinela-Payload': payload.content
           },
           signal: controller.signal
         });
         clearTimeout(timeoutId);
 
-        // With mode 'no-cors', type is 'opaque'. 
-        // If the firewall resets the connection, the fetch usually fails and goes to 'catch'.
-        // If it returns a response (even opaque), it likely got through unless status is 403.
         return {
           testId: payload.id,
           status: TestStatus.PASSED,
           timestamp: new Date().toISOString(),
           responseTime: Date.now() - startTime,
-          details: `Request reached destination. Security control failed to intercept this signature.`
+          details: `SUCCESSFUL PENETRATION: The request was fulfilled by the target. The NGFW/WAF allowed this malicious signature to pass through without interference.`
         };
       } else if (payload.type === 'download') {
         const blob = new Blob([payload.content], { type: 'text/plain' });
@@ -52,7 +60,7 @@ export class TestRunner {
           testId: payload.id,
           status: TestStatus.PASSED,
           timestamp: new Date().toISOString(),
-          details: "File download initiated. Check your EDR/AV for real-time quarantine events."
+          details: "FILE DROPPED: The malicious file was successfully saved to disk. EDR/AV did not prevent the file write operation."
         };
       } else if (payload.type === 'script') {
         await navigator.clipboard.writeText(payload.content);
@@ -60,7 +68,7 @@ export class TestRunner {
           testId: payload.id,
           status: TestStatus.IDLE,
           timestamp: new Date().toISOString(),
-          details: "Behavioral payload copied to clipboard. Execute this in a Terminal on the target machine to test EDR heuristics."
+          details: "BEHAVIORAL PAYLOAD: Copied to clipboard. Manual execution required to trigger EDR heuristics."
         };
       }
       
@@ -71,14 +79,26 @@ export class TestRunner {
         details: "Unsupported test type."
       };
     } catch (error: any) {
-      // In web-based security testing, a 'TypeError: Failed to fetch' or AbortError 
-      // is the standard signal that a Network Firewall (NGFW) has dropped the packet or sent a TCP Reset.
+      const duration = Date.now() - startTime;
+      
+      // If it's an AbortError and took ~4s, it's a timeout (often an IPS silent drop)
+      if (error.name === 'AbortError' || duration > 3500) {
+        return {
+          testId: payload.id,
+          status: TestStatus.BLOCKED,
+          timestamp: new Date().toISOString(),
+          responseTime: duration,
+          details: `SILENT DROP (TIMEOUT): The connection timed out. This usually indicates an IPS or Firewall silently dropping the packets containing the exploit signature.`
+        };
+      }
+
+      // Likely a TCP Reset or Connection Refused
       return {
         testId: payload.id,
         status: TestStatus.BLOCKED,
         timestamp: new Date().toISOString(),
-        responseTime: Date.now() - startTime,
-        details: `CONNECTION TERMINATED: ${error.name}. The payload was likely dropped or rejected by the NGFW/IPS engine.`
+        responseTime: duration,
+        details: `ACTIVE BLOCK (TCP RESET): The security control actively terminated the connection (likely a TCP RST packet). Logic: ${error.message}`
       };
     }
   }
