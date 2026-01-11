@@ -86,7 +86,7 @@ const App: React.FC = () => {
         </div>
 
         <nav className="flex-1 px-4 mt-8 space-y-1 overflow-y-auto custom-scrollbar">
-          <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-2 mb-4">{(isDesktopSidebarOpen || isSidebarOpen) ? 'Threat Categories' : 'TC'}</div>
+          <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-2 mb-4">{(isDesktopSidebarOpen || isSidebarOpen) ? 'Capabilities' : 'CAP'}</div>
           {categories.map((cat) => (
             <button key={cat} onClick={() => { setActiveTab(cat as any); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 group ${activeTab === cat ? 'bg-blue-600/10 text-blue-400 border border-blue-900/50' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'}`}>
               <Database size={18} className={activeTab === cat ? 'text-blue-400' : 'text-gray-500'} />
@@ -101,7 +101,7 @@ const App: React.FC = () => {
         </nav>
 
         <div className="p-4 border-t border-gray-800 hidden lg:block text-center">
-           <p className="text-[10px] text-gray-500 font-mono">Sentinela Core v2.4</p>
+           <p className="text-[10px] text-gray-500 font-mono">Sentinela Core v2.5</p>
         </div>
       </aside>
 
@@ -113,7 +113,7 @@ const App: React.FC = () => {
             </button>
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-              <input type="text" placeholder="Search threats..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-gray-900 border border-gray-800 rounded-lg py-1.5 lg:py-2 pl-9 pr-4 text-xs lg:text-sm focus:outline-none focus:border-blue-500 transition-all" />
+              <input type="text" placeholder="Search vectors..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-gray-900 border border-gray-800 rounded-lg py-1.5 lg:py-2 pl-9 pr-4 text-xs lg:text-sm focus:outline-none focus:border-blue-500 transition-all" />
             </div>
           </div>
 
@@ -145,7 +145,7 @@ const App: React.FC = () => {
 
             <button onClick={generateReport} disabled={results.length === 0 || isAnalyzing} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-500 text-white text-xs lg:text-sm font-semibold rounded-lg shadow-lg shadow-blue-900/20 transition-all flex items-center gap-2">
               {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <FileCheck size={16} />}
-              <span>Generate Audit</span>
+              <span>Generate Forensic Audit</span>
             </button>
           </div>
         </header>
@@ -171,8 +171,8 @@ const App: React.FC = () => {
                   )}
                 </h2>
                 <p className="text-sm lg:text-base text-gray-400 max-w-2xl font-medium">
-                  Testing resilience of <span className="text-blue-400 font-mono font-bold underline">{targetUrl}</span>. 
-                  Data proof is captured for every transaction to verify security policy enforcement.
+                  Auditing security efficacy for <span className="text-blue-400 font-mono font-bold underline">{targetUrl}</span>. 
+                  Every execution captures deterministic evidence of block or bypass.
                 </p>
               </div>
 
@@ -197,7 +197,7 @@ const App: React.FC = () => {
              <Terminal size={14} className="text-gray-700" />
           </div>
           <p className="font-bold text-gray-400 uppercase tracking-[0.2em] mb-1">Sentinela validation suite</p>
-          <p className="mb-2">Professional Grade NGFW & EDR Capability Testing</p>
+          <p className="mb-2">Automated NGFW, WAF, & EDR Efficacy Auditor</p>
           <div className="flex items-center justify-center gap-2 font-mono text-gray-600">
              <span>App created by <span className="text-blue-500 font-black">tegar</span></span>
              <span className="text-gray-800">•</span>
@@ -212,11 +212,11 @@ const App: React.FC = () => {
           <div className="relative bg-gray-900 border border-gray-800 w-full max-w-2xl rounded-3xl p-8 animate-in fade-in zoom-in duration-300">
             <h3 className="text-2xl font-black mb-4 flex items-center gap-3"><Terminal size={24} className="text-blue-500" /> Lab Field Manual</h3>
             <div className="space-y-4 text-sm text-gray-400 leading-relaxed">
-              <p>1. <strong className="text-white">Verify Connectivity:</strong> Green icon = Reachable. Red icon = Target Offline.</p>
-              <p>2. <strong className="text-white">Analyze Proof:</strong> After each test, view the 'Data Proof' to see exactly what the server or firewall returned.</p>
-              <p>3. <strong className="text-white">Reporting:</strong> Generate the audit report to see a visual map of your security blindspots.</p>
+              <p>1. <strong className="text-white">Endpoint Verification:</strong> Ensure the connectivity status is Green before starting.</p>
+              <p>2. <strong className="text-white">Forensic Evidence:</strong> After triggering an attack, examine the captured response body or header to confirm if the firewall actively blocked or was bypassed.</p>
+              <p>3. <strong className="text-white">Audit Trail:</strong> Use the Report function to summarize the entire test surface and technical gaps.</p>
             </div>
-            <button onClick={() => setShowGuide(false)} className="mt-8 w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition-all">Enter Lab</button>
+            <button onClick={() => setShowGuide(false)} className="mt-8 w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold transition-all">Begin Audit</button>
           </div>
         </div>
       )}

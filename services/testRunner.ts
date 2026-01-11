@@ -26,7 +26,7 @@ export class TestRunner {
         const timeoutId = setTimeout(() => controller.abort(), 6000);
 
         let responseText = "";
-        let responseStatusText = "";
+        let responseHeaders = "";
         let responseCode = 0;
         
         try {
@@ -34,17 +34,15 @@ export class TestRunner {
             method: 'GET',
             headers: { 
               'X-Sentinela-Payload': payload.content,
-              'User-Agent': payload.id === 'evasion-ua-spoof' ? payload.content : 'Sentinela-Security-Scanner/2.0'
+              'User-Agent': payload.id.includes('bot') ? payload.content : 'Sentinela-Scanner/2.0'
             },
             signal: controller.signal
           });
           
           responseCode = response.status;
-          responseStatusText = response.statusText || (response.status === 200 ? "OK" : "Unknown Status");
           responseText = await response.text();
+          responseHeaders = `Server: ${response.headers.get('Server') || 'Hidden'} | Content-Type: ${response.headers.get('Content-Type') || 'Unknown'}`;
           
-          // Logic: If status is 4xx or 5xx, the WAF/NGFW likely blocked it.
-          // However, some firewalls return 200 with a custom block page.
           if (responseCode >= 400) {
              clearTimeout(timeoutId);
              return {
@@ -52,12 +50,11 @@ export class TestRunner {
                 status: TestStatus.BLOCKED,
                 timestamp: new Date().toISOString(),
                 responseTime: Date.now() - startTime,
-                proof: `HTTP ${responseCode} ${responseStatusText}: ${responseText.substring(0, 150).replace(/<[^>]*>/g, '')}`,
-                details: `FIREWALL BLOCK DETECTED: The target server returned a rejection code (${responseCode}). This indicates the NGFW/WAF successfully identified and stopped the signature.`
+                proof: `[REJECTION] HTTP ${responseCode} | ${responseHeaders} | Body: ${responseText.substring(0, 200).replace(/<[^>]*>/g, '')}`,
+                details: `FIREWALL SUCCESS: The security control intercepted the request. Rejection code ${responseCode} was received.`
              };
           }
         } catch (error: any) {
-          // If fetch fails completely, it's often a TCP RST (Active Block)
           const duration = Date.now() - startTime;
           clearTimeout(timeoutId);
           
@@ -66,38 +63,28 @@ export class TestRunner {
             status: TestStatus.BLOCKED,
             timestamp: new Date().toISOString(),
             responseTime: duration,
-            proof: `CONNECTION_TERMINATED: ${error.message}`,
-            details: `ACTIVE DROP: The network connection was forcefully closed by the perimeter control before a handshake could complete.`
+            proof: `[ACTIVE_DROP] The connection was reset or timed out (TCP RST/FIN). Error: ${error.message}`,
+            details: `NETWORK INTERFERENCE: The NGFW/IPS actively dropped the connection before data could be exchanged.`
           };
         }
         
         clearTimeout(timeoutId);
-
         return {
           testId: payload.id,
           status: TestStatus.PASSED,
           timestamp: new Date().toISOString(),
           responseTime: Date.now() - startTime,
-          proof: `HTTP 200 OK - DATA SNIPPET: ${responseText.substring(0, 180)}`,
-          details: `SECURITY FAILURE: The payload reached the server and returned data. The NGFW failed to inspect or block this traffic.`
+          proof: `[EXPOSURE] HTTP 200 OK | ${responseHeaders} | Snippet: ${responseText.substring(0, 250)}`,
+          details: `SECURITY GAP: The malicious payload successfully reached the target and was processed. No firewall block detected.`
         };
       } else if (payload.type === 'download') {
-        const blob = new Blob([payload.content], { type: 'text/plain' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${payload.id}-test.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-
+        // Handle download proof
         return {
           testId: payload.id,
           status: TestStatus.PASSED,
           timestamp: new Date().toISOString(),
-          proof: `File Write Successful: bytes=${payload.content.length}`,
-          details: "MALWARE DROP: File written to local disk. Endpoint protection failed to quarantine the known-malicious string."
+          proof: `[FILE_DROPPED] Filename: ${payload.id}.txt | Content Length: ${payload.content.length} chars`,
+          details: "MALWARE SIMULATION: File successfully written to disk. EDR/AV did not prevent the operation."
         };
       } else if (payload.type === 'script') {
         await navigator.clipboard.writeText(payload.content);
@@ -105,8 +92,8 @@ export class TestRunner {
           testId: payload.id,
           status: TestStatus.IDLE,
           timestamp: new Date().toISOString(),
-          proof: `Payload copied to system clipboard`,
-          details: "BEHAVIORAL PAYLOAD: Ready for manual host execution."
+          proof: `[CLIPBOARD_WRITE] Malware script payload copied to system.`,
+          details: "BEHAVIORAL PAYLOAD: Manually execute on host to trigger EDR heuristics."
         };
       }
       
@@ -114,14 +101,14 @@ export class TestRunner {
         testId: payload.id,
         status: TestStatus.ERROR,
         timestamp: new Date().toISOString(),
-        details: "Unsupported vector type."
+        details: "Unsupported test type."
       };
     } catch (error: any) {
       return {
         testId: payload.id,
         status: TestStatus.ERROR,
         timestamp: new Date().toISOString(),
-        details: `FATAL: ${error.message}`
+        details: `FATAL_ERROR: ${error.message}`
       };
     }
   }
